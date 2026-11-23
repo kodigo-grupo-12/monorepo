@@ -1,36 +1,10 @@
-import { useLayoutEffect, useState } from 'react';
-import { Appearance, ColorSchemeName } from 'react-native';
-
-import { leerEsquema } from './leerEsquema';
-
-export const colores = {
-  claro: {
-    fondo: '#DDE2DE',
-    texto: '#1A1A1A',
-    credito: '#3D4A42',
-  },
-  oscuro: {
-    fondo: '#121417',
-    texto: '#F4F7F5',
-    credito: '#C5CDC8',
-  },
+// El MVP se queda en el oscuro de las plantillas. El modo del teléfono no entra.
+export const paleta = {
+  fondo: '#1C1C1E',
+  texto: '#F4F7F5',
+  credito: '#C5CDC8',
+  verdeCarrusel: '#2E7D32',
+  verdeLogin: '#2DB84C',
+  puntoInactivo: '#787C80',
+  textoSuave: '#A3AAA7',
 } as const;
-
-export type NombreDeEsquema = keyof typeof colores;
-
-function nombreDelEsquema(sistema: ColorSchemeName | null | undefined): NombreDeEsquema {
-  return sistema === 'dark' ? 'oscuro' : 'claro';
-}
-
-export function usarPaleta() {
-  const [esquema, setEsquema] = useState<NombreDeEsquema>('claro');
-
-  useLayoutEffect(() => {
-    const aplicar = () => setEsquema(nombreDelEsquema(leerEsquema()));
-    aplicar();
-    const suscripcion = Appearance.addChangeListener(aplicar);
-    return () => suscripcion.remove();
-  }, []);
-
-  return { esquema, ...colores[esquema] };
-}

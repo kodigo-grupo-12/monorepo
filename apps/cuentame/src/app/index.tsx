@@ -1,20 +1,20 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-export default function PantallaInicio() {
-  return (
-    <View style={estilos.contenedor}>
-      <Text style={estilos.titulo}>Cuéntame</Text>
-    </View>
-  );
+import { PantallaCarrusel } from '../carrusel/PantallaCarrusel';
+import { PantallaInicio } from '../inicio/PantallaInicio';
+import { usarSesion } from '../sesion/ProveedorSesion';
+import { paleta } from '../tema/colores';
+
+export default function PantallaSegunSesion() {
+  const { cargando, activa } = usarSesion();
+
+  if (cargando) {
+    return <View style={{ flex: 1, backgroundColor: paleta.fondo }} />;
+  }
+
+  if (activa) {
+    return <PantallaInicio />;
+  }
+
+  return <PantallaCarrusel />;
 }
-
-const estilos = StyleSheet.create({
-  contenedor: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titulo: {
-    fontSize: 32,
-  },
-});

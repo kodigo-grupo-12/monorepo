@@ -22,7 +22,7 @@ Ese comando instala el único paquete, `cuentame`. Después, en una terminal:
 pnpm start
 ```
 
-`pnpm start` no termina: levanta un solo servidor. El navegador muestra la pantalla «Cuéntame» y el teléfono abre esa misma pantalla. En otra terminal:
+`pnpm start` no termina: levanta un solo servidor. Sin sesión, el navegador muestra el splash y después el carrusel. Con sesión, el splash deja ver el inicio. El teléfono abre esa misma pantalla. En otra terminal:
 
 ```bash
 pnpm typecheck
@@ -33,3 +33,16 @@ pnpm typecheck
 El teléfono tiene que estar en la misma red y usar Expo Go del SDK 58. No se usa la carpeta nativa de Android y no se genera un APK.
 
 Lint, los tests automáticos y el build formal quedan fuera de esta tarea.
+
+## Ilustraciones del carrusel
+
+Las seis ilustraciones de `apps/cuentame/assets/carrusel/` son copias. Se reponen desde la carpeta de assets del carrusel de la TAREA 003:
+
+- `01-finanzas-simple.png`
+- `02-gastos-por-mes.png`
+- `03-balance-todo.png`
+- `04-metas-ahorro.png`
+- `05-agente.png`
+- `06-privacidad.png`
+
+La pantalla no las pide por URL. El modelo y la plantilla de login no se muestran.
