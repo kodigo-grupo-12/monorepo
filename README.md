@@ -22,7 +22,7 @@ Ese comando instala el único paquete, `cuentame`. Después, en una terminal:
 pnpm start
 ```
 
-`pnpm start` no termina: levanta un solo servidor. Sin sesión, el navegador muestra el splash y después el carrusel. El teléfono abre esa misma pantalla. En otra terminal:
+`pnpm start` no termina: levanta un solo servidor. Sin sesión, el navegador muestra el splash y después el carrusel. Con sesión, el splash deja ver el inicio. El teléfono abre esa misma pantalla. En otra terminal:
 
 ```bash
 pnpm typecheck

@@ -4,6 +4,7 @@ export const paleta = {
   texto: '#F4F7F5',
   credito: '#C5CDC8',
   verdeCarrusel: '#2E7D32',
+  verdeLogin: '#2DB84C',
   puntoInactivo: '#787C80',
   textoSuave: '#A3AAA7',
 } as const;
