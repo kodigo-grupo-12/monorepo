@@ -13,7 +13,7 @@ export default function DisposicionRaiz() {
     <View style={{ flex: 1, backgroundColor: paleta.fondo }}>
       <StatusBar style="light" />
       <View
-        style={{ flex: 1, backgroundColor: paleta.fondo }}
+        style={{ flex: 1 }}
         aria-hidden={splashActivo}
         accessibilityElementsHidden={splashActivo}
         importantForAccessibility={splashActivo ? 'no-hide-descendants' : 'auto'}

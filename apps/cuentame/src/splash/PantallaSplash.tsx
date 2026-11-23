@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { usarPaleta } from '../tema/colores';
+import { paleta } from '../tema/colores';
 import { reducirMovimientoInicial } from './reducirMovimientoInicial';
 
 // Copias locales. La fuente es la carpeta Assets de kodigo-grupo-12/.github.
@@ -45,7 +45,6 @@ type Propiedades = {
 };
 
 export function PantallaSplash({ alTerminar }: Propiedades) {
-  const paleta = usarPaleta();
   const insets = useSafeAreaInsets();
   const alTerminarRef = useRef(alTerminar);
   const saliendo = useRef(false);
