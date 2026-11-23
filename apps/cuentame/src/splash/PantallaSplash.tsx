@@ -295,8 +295,8 @@ const estilos = StyleSheet.create({
   },
   linea: {
     flexShrink: 1,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 24,
+    lineHeight: 32,
   },
   toque: {
     position: 'absolute',
