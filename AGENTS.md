@@ -14,11 +14,17 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 
 ## Validación rápida
 
-Desde la raíz, con Node 22.13 o más:
+Desde la raíz, con Node 22.13 o más. `pnpm start` no termina, así que el typecheck va en otra terminal:
 
 ```bash
 pnpm install
+```
+
+```bash
 pnpm start
+```
+
+```bash
 pnpm typecheck
 ```
 

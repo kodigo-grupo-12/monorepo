@@ -10,15 +10,25 @@ En esta etapa la aplicación se llama Cuéntame. El nombre puede cambiar.
 
 ## Validación rápida
 
-Hace falta Node 22.13 o más. En la raíz del repo:
+Hace falta Node 22.13 o más. En la raíz del repo, primero:
 
 ```bash
 pnpm install
+```
+
+Ese comando instala el único paquete, `cuentame`. Después, en una terminal:
+
+```bash
 pnpm start
+```
+
+`pnpm start` no termina: levanta un solo servidor. El navegador muestra la pantalla «Cuéntame» y el teléfono abre esa misma pantalla. En otra terminal:
+
+```bash
 pnpm typecheck
 ```
 
-`pnpm install` instala el único paquete, `cuentame`. `pnpm start` levanta un solo servidor: el navegador muestra la pantalla «Cuéntame» y el teléfono abre esa misma pantalla. `pnpm typecheck` es el chequeo automático.
+`pnpm typecheck` es el chequeo automático.
 
 El teléfono tiene que estar en la misma red y usar Expo Go del SDK 58. No se usa la carpeta nativa de Android y no se genera un APK.
 
