@@ -37,7 +37,7 @@ function usarReducirMovimiento() {
 }
 
 export function PantallaCarrusel() {
-  const router = useRouter();
+  const enrutador = useRouter();
   const insets = useSafeAreaInsets();
   const reducir = usarReducirMovimiento();
   const splashEncima = usarSplashActivo();
@@ -138,7 +138,7 @@ export function PantallaCarrusel() {
         accessibilityRole="button"
         accessibilityLabel="INICIAR SESIÓN"
         style={[estilos.boton, { backgroundColor: paleta.verdeCarrusel }]}
-        onPress={() => router.push('/login')}
+        onPress={() => enrutador.push('/login')}
       >
         <Text style={estilos.botonTexto}>INICIAR SESIÓN</Text>
       </Pressable>
@@ -146,7 +146,7 @@ export function PantallaCarrusel() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="SALTAR"
-        onPress={() => router.push('/login')}
+        onPress={() => enrutador.push('/login')}
         style={estilos.saltar}
       >
         <Text style={[estilos.saltarTexto, { color: paleta.verdeCarrusel }]}>SALTAR</Text>

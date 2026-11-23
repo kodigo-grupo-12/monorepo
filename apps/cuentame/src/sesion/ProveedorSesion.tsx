@@ -2,13 +2,13 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import { guardarSesion, leerSesion } from './guardarSesion';
 
-type Valor = {
+type EstadoDeSesion = {
   cargando: boolean;
   activa: boolean;
   entrar: () => Promise<void>;
 };
 
-const Contexto = createContext<Valor | null>(null);
+const Contexto = createContext<EstadoDeSesion | null>(null);
 
 export function ProveedorSesion({ children }: { children: ReactNode }) {
   const [cargando, setCargando] = useState(true);
@@ -45,7 +45,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   return <Contexto.Provider value={{ cargando, activa, entrar }}>{children}</Contexto.Provider>;
 }
 
-export function usarSesion(): Valor {
+export function usarSesion(): EstadoDeSesion {
   const valor = useContext(Contexto);
   if (!valor) {
     throw new Error('usarSesion va dentro de ProveedorSesion');

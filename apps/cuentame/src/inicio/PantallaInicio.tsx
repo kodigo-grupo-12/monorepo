@@ -1,13 +1,32 @@
 import { useEffect } from 'react';
-import { BackHandler, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, Platform, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { paleta } from '../tema/colores';
 
 export function PantallaInicio() {
+  const enrutador = useRouter();
+
   useEffect(() => {
     const suscripcion = BackHandler.addEventListener('hardwareBackPress', () => true);
-    return () => suscripcion.remove();
-  }, []);
+
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return () => suscripcion.remove();
+    }
+
+    const quedarse = () => {
+      if (window.location.pathname.includes('login')) {
+        enrutador.replace('/');
+      }
+    };
+
+    window.addEventListener('popstate', quedarse);
+
+    return () => {
+      suscripcion.remove();
+      window.removeEventListener('popstate', quedarse);
+    };
+  }, [enrutador]);
 
   return (
     <View style={[estilos.contenedor, { backgroundColor: paleta.fondo }]}>

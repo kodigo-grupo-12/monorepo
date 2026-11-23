@@ -2,33 +2,35 @@ import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const CLAVE = 'cuentame-sesion';
-const VALOR = '1';
-
-export const CORREO_DEMO = 'demo@cuentame.com';
-export const CONTRASENA_DEMO = 'demo1234';
+const MARCA_PRESENTE = '1';
 
 function enWeb(): boolean {
   return Platform.OS === 'web' && typeof localStorage !== 'undefined';
 }
 
-export async function leerSesion(): Promise<boolean> {
+async function leerMarca(): Promise<string | null> {
   if (Platform.OS === 'web') {
-    if (!enWeb()) {
-      return false;
-    }
-    return localStorage.getItem(CLAVE) === VALOR;
+    return enWeb() ? localStorage.getItem(CLAVE) : null;
   }
 
-  return (await SecureStore.getItemAsync(CLAVE)) === VALOR;
+  return SecureStore.getItemAsync(CLAVE);
 }
 
-export async function guardarSesion(): Promise<void> {
+async function escribirMarca(): Promise<void> {
   if (Platform.OS === 'web') {
     if (enWeb()) {
-      localStorage.setItem(CLAVE, VALOR);
+      localStorage.setItem(CLAVE, MARCA_PRESENTE);
     }
     return;
   }
 
-  await SecureStore.setItemAsync(CLAVE, VALOR);
+  await SecureStore.setItemAsync(CLAVE, MARCA_PRESENTE);
+}
+
+export async function leerSesion(): Promise<boolean> {
+  return (await leerMarca()) === MARCA_PRESENTE;
+}
+
+export async function guardarSesion(): Promise<void> {
+  await escribirMarca();
 }

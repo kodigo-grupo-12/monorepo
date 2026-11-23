@@ -10,7 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CONTRASENA_DEMO, CORREO_DEMO } from '../sesion/guardarSesion';
+import { cuentaDemo } from '../sesion/cuentaDemo';
 import { usarSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
@@ -18,38 +18,44 @@ const AVISO_DEMO = 'Ese correo o esa contraseña no son los de la cuenta demo.';
 const AVISO_ETAPA = 'En esta etapa solo entra la cuenta demo.';
 
 export function PantallaLogin() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const enrutador = useRouter();
+  const margenes = useSafeAreaInsets();
   const { entrar } = usarSesion();
-  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
-  const [correo, setCorreo] = useState(CORREO_DEMO);
-  const [contrasena, setContrasena] = useState(CONTRASENA_DEMO);
+  const desplazamiento = useRef<ComponentRef<typeof ScrollView>>(null);
+  const entrando = useRef(false);
+  const [correo, setCorreo] = useState<string>(cuentaDemo.correo);
+  const [contrasena, setContrasena] = useState<string>(cuentaDemo.contrasena);
   const [oculta, setOculta] = useState(true);
   const [aviso, setAviso] = useState('');
 
   const irAlBoton = () => {
-    scroll.current?.scrollToEnd({ animated: true });
+    desplazamiento.current?.scrollToEnd({ animated: true });
   };
 
   const iniciar = async () => {
-    if (correo !== CORREO_DEMO || contrasena !== CONTRASENA_DEMO) {
+    if (entrando.current) {
+      return;
+    }
+
+    if (correo !== cuentaDemo.correo || contrasena !== cuentaDemo.contrasena) {
       setAviso(AVISO_DEMO);
       return;
     }
 
+    entrando.current = true;
     await entrar();
-    router.back();
+    enrutador.replace('/');
   };
 
   return (
     <ScrollView
-      ref={scroll}
+      ref={desplazamiento}
       style={{ backgroundColor: paleta.fondo }}
       contentContainerStyle={[
         estilos.contenido,
         {
-          paddingTop: Math.max(insets.top, 12),
-          paddingBottom: Math.max(insets.bottom, 24),
+          paddingTop: Math.max(margenes.top, 12),
+          paddingBottom: Math.max(margenes.bottom, 24),
         },
       ]}
       keyboardShouldPersistTaps="handled"
@@ -58,7 +64,7 @@ export function PantallaLogin() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="atrás"
-        onPress={() => router.back()}
+        onPress={() => enrutador.back()}
         style={estilos.atras}
       >
         <Text style={[estilos.flecha, { color: paleta.texto }]}>←</Text>
@@ -96,7 +102,7 @@ export function PantallaLogin() {
           onPress={() => setOculta((valor) => !valor)}
           hitSlop={8}
         >
-          <Text style={[estilos.ojo, { color: paleta.textoSuave }]}>{oculta ? '◉' : '◎'}</Text>
+          <Text style={[estilos.ojo, { color: paleta.texto }]}>{oculta ? '👁' : '👁‍🗨'}</Text>
         </Pressable>
       </View>
 

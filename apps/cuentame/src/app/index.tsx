@@ -5,7 +5,7 @@ import { PantallaInicio } from '../inicio/PantallaInicio';
 import { usarSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
-export default function RutaInicio() {
+export default function PantallaSegunSesion() {
   const { cargando, activa } = usarSesion();
 
   if (cargando) {
