@@ -1,5 +1,5 @@
 {
-  "name": "cuentame-monorepo",
+  "name": "raiz",
   "private": true,
   "packageManager": "pnpm@12.15.0",
   "engines": {
