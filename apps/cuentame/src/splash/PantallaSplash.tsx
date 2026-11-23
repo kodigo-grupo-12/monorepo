@@ -12,16 +12,14 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { usarPaleta } from '../tema/colores';
+import { paleta } from '../tema/colores';
 import { reducirMovimientoInicial } from './reducirMovimientoInicial';
 
 // Copias locales. La fuente es la carpeta Assets de kodigo-grupo-12/.github.
 // icono.png sale de cuentame-web-512.png.
-// logo-kodigo-claro.png sale de kodigo_logo.png.
-// logo-kodigo-oscuro.png sale de kodigo_logo_dark.png.
+// logo-kodigo-oscuro.png sale de kodigo_logo_dark.png y se lee en claro sobre el fondo oscuro.
 const icono = require('../../assets/marca/icono.png');
-const logoClaro = require('../../assets/marca/logo-kodigo-claro.png');
-const logoOscuro = require('../../assets/marca/logo-kodigo-oscuro.png');
+const logo = require('../../assets/marca/logo-kodigo-oscuro.png');
 
 const ESPERA_MS = 2000;
 const DURACION_ICONO_MS = 450;
@@ -47,7 +45,6 @@ type Propiedades = {
 };
 
 export function PantallaSplash({ alTerminar }: Propiedades) {
-  const paleta = usarPaleta();
   const insets = useSafeAreaInsets();
   const alTerminarRef = useRef(alTerminar);
   const saliendo = useRef(false);
@@ -202,8 +199,6 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
       suscripcion.remove();
     };
   }, [escalaIcono, opacidadCapa, opacidadCredito, opacidadIcono]);
-
-  const logo = paleta.esquema === 'oscuro' ? logoOscuro : logoClaro;
 
   return (
     <Animated.View

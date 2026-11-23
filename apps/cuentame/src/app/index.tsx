@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { paleta } from '../tema/colores';
+
 export default function PantallaInicio() {
   return (
-    <View style={estilos.contenedor}>
-      <Text style={estilos.titulo}>Cuéntame</Text>
+    <View style={[estilos.contenedor, { backgroundColor: paleta.fondo }]}>
+      <Text style={[estilos.titulo, { color: paleta.texto }]}>Cuéntame</Text>
     </View>
   );
 }
