@@ -1,5 +1,1 @@
-import { PantallaCarrusel } from '../carrusel/PantallaCarrusel';
-
-export default function PantallaDeEntrada() {
-  return <PantallaCarrusel />;
-}
+export { PantallaCarrusel as default } from '../carrusel/PantallaCarrusel';

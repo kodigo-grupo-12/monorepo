@@ -10,7 +10,7 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { usarSplashActivo } from '../entrada/SplashActivo';
+import { usarSplashActivo } from '../splash/SplashActivo';
 import { reducirMovimientoInicial } from '../splash/reducirMovimientoInicial';
 import { paleta } from '../tema/colores';
 import { laminas, SEGUNDO_MS } from './laminas';
@@ -40,6 +40,7 @@ export function PantallaCarrusel() {
   const reducir = usarReducirMovimiento();
   const splashEncima = usarSplashActivo();
   const [indice, setIndice] = useState(0);
+  const [ciclo, setCiclo] = useState(0);
   const indiceRef = useRef(0);
   indiceRef.current = indice;
 
@@ -47,6 +48,7 @@ export function PantallaCarrusel() {
     const total = laminas.length;
     const normalizado = ((siguiente % total) + total) % total;
     setIndice(normalizado);
+    setCiclo((valor) => valor + 1);
   };
 
   useEffect(() => {
@@ -54,9 +56,9 @@ export function PantallaCarrusel() {
       return;
     }
 
-    const id = setTimeout(() => irA(indiceRef.current + 1), SEGUNDO_MS);
-    return () => clearTimeout(id);
-  }, [indice, reducir, splashEncima]);
+    const temporizador = setTimeout(() => irA(indiceRef.current + 1), SEGUNDO_MS);
+    return () => clearTimeout(temporizador);
+  }, [indice, ciclo, reducir, splashEncima]);
 
   const gesto = useRef(
     PanResponder.create({
@@ -87,25 +89,32 @@ export function PantallaCarrusel() {
         <Text style={[estilos.marca, { color: paleta.verdeCarrusel }]}>cuéntame</Text>
       </View>
 
-      <View style={estilos.ilustracion} {...gesto.panHandlers}>
-        <Image
-          source={lamina.imagen}
-          style={estilos.dibujo}
-          contentFit="contain"
-          accessible={false}
-          importantForAccessibility="no"
-        />
-      </View>
+      <View style={estilos.zona} {...gesto.panHandlers}>
+        <View style={estilos.ilustracion}>
+          <Image
+            source={lamina.imagen}
+            style={estilos.dibujo}
+            contentFit="contain"
+            accessible={false}
+            importantForAccessibility="no"
+          />
+        </View>
 
-      <View style={estilos.titular}>
-        <Text style={[estilos.linea, { color: paleta.texto }]}>{lamina.lineas[0]}</Text>
-        <Text style={[estilos.linea, { color: paleta.texto }]}>{lamina.lineas[1]}</Text>
+        <View style={estilos.titular}>
+          {lamina.lineas
+            .filter((linea) => linea.trim().length > 0)
+            .map((linea) => (
+              <Text key={linea} style={[estilos.linea, { color: paleta.texto }]}>
+                {linea}
+              </Text>
+            ))}
+        </View>
       </View>
 
       <View style={estilos.puntos}>
-        {laminas.map((item, posicion) => {
+        {laminas.map((laminaDelPunto, posicion) => {
           const activo = posicion === indice;
-          const nombre = item.lineas.filter((linea) => linea.trim().length > 0).join(' ');
+          const nombre = laminaDelPunto.lineas.filter((linea) => linea.trim().length > 0).join(' ');
           return (
             <Pressable
               key={nombre}
@@ -116,7 +125,7 @@ export function PantallaCarrusel() {
               hitSlop={8}
               style={[
                 estilos.punto,
-                { backgroundColor: activo ? paleta.verdeCarrusel : paleta.punto },
+                { backgroundColor: activo ? paleta.verdeCarrusel : paleta.puntoInactivo },
               ]}
             />
           );
@@ -172,6 +181,9 @@ const estilos = StyleSheet.create({
   marca: {
     fontSize: 22,
     fontWeight: '700',
+  },
+  zona: {
+    flex: 1,
   },
   ilustracion: {
     flex: 1,
