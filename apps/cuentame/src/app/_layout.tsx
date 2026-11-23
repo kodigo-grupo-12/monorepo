@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { ProveedorSesion } from '../sesion/ProveedorSesion';
 import { ProveedorSplash } from '../splash/SplashActivo';
 import { PantallaSplash } from '../splash/PantallaSplash';
 import { paleta } from '../tema/colores';
@@ -11,6 +12,7 @@ export default function DisposicionRaiz() {
   const [splashActivo, setSplashActivo] = useState(true);
 
   return (
+    <ProveedorSesion>
     <ProveedorSplash activo={splashActivo}>
     <View style={{ flex: 1, backgroundColor: paleta.fondo }}>
       <StatusBar style="light" />
@@ -33,5 +35,6 @@ export default function DisposicionRaiz() {
       ) : null}
     </View>
     </ProveedorSplash>
+    </ProveedorSesion>
   );
 }

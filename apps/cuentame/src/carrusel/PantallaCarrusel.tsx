@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usarSplashActivo } from '../splash/SplashActivo';
@@ -36,6 +37,7 @@ function usarReducirMovimiento() {
 }
 
 export function PantallaCarrusel() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const reducir = usarReducirMovimiento();
   const splashEncima = usarSplashActivo();
@@ -136,7 +138,7 @@ export function PantallaCarrusel() {
         accessibilityRole="button"
         accessibilityLabel="INICIAR SESIÓN"
         style={[estilos.boton, { backgroundColor: paleta.verdeCarrusel }]}
-        onPress={() => undefined}
+        onPress={() => router.push('/login')}
       >
         <Text style={estilos.botonTexto}>INICIAR SESIÓN</Text>
       </Pressable>
@@ -144,7 +146,7 @@ export function PantallaCarrusel() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="SALTAR"
-        onPress={() => undefined}
+        onPress={() => router.push('/login')}
         style={estilos.saltar}
       >
         <Text style={[estilos.saltarTexto, { color: paleta.verdeCarrusel }]}>SALTAR</Text>
