@@ -1,6 +1,8 @@
 import { useLayoutEffect, useState } from 'react';
 import { Appearance, ColorSchemeName } from 'react-native';
 
+import { leerEsquema } from './leerEsquema';
+
 export const colores = {
   claro: {
     fondo: '#DDE2DE',
@@ -16,26 +18,17 @@ export const colores = {
 
 export type NombreDeEsquema = keyof typeof colores;
 
-function aNombre(sistema: ColorSchemeName | null | undefined): NombreDeEsquema {
+function nombreDelEsquema(sistema: ColorSchemeName | null | undefined): NombreDeEsquema {
   return sistema === 'dark' ? 'oscuro' : 'claro';
-}
-
-function esquemaDeLaVentana(): NombreDeEsquema | null {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return null;
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
 }
 
 export function usarPaleta() {
   const [esquema, setEsquema] = useState<NombreDeEsquema>('claro');
 
   useLayoutEffect(() => {
-    setEsquema(esquemaDeLaVentana() ?? aNombre(Appearance.getColorScheme()));
-    const suscripcion = Appearance.addChangeListener(({ colorScheme }) => {
-      setEsquema(esquemaDeLaVentana() ?? aNombre(colorScheme));
-    });
+    const aplicar = () => setEsquema(nombreDelEsquema(leerEsquema()));
+    aplicar();
+    const suscripcion = Appearance.addChangeListener(aplicar);
     return () => suscripcion.remove();
   }, []);
 

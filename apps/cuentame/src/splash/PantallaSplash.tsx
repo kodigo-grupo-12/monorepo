@@ -10,10 +10,10 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usarPaleta } from '../tema/colores';
+import { reducirMovimientoInicial } from './reducirMovimientoInicial';
 
 // Copias locales. La fuente es la carpeta Assets de kodigo-grupo-12/.github.
 // icono.png sale de cuentame-web-512.png.
@@ -32,6 +32,16 @@ const ESCALA_INICIAL = 0.92;
 
 const controladorNativo = Platform.OS !== 'web';
 
+function animar(valor: Animated.Value, destino: number, duracion: number, demora = 0) {
+  return Animated.timing(valor, {
+    toValue: destino,
+    duration: duracion,
+    delay: demora,
+    easing: Easing.out(Easing.cubic),
+    useNativeDriver: controladorNativo,
+  });
+}
+
 type Propiedades = {
   alTerminar: () => void;
 };
@@ -44,6 +54,8 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
   const terminado = useRef(false);
   const entradaHecha = useRef(false);
   const imagenLista = useRef(false);
+  const preferenciaLista = useRef(false);
+  const salidaPendiente = useRef(false);
   const reducirRef = useRef(false);
   const opacidadIcono = useRef(new Animated.Value(0)).current;
   const escalaIcono = useRef(new Animated.Value(ESCALA_INICIAL)).current;
@@ -65,13 +77,20 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
     opacidadIcono.stopAnimation();
     escalaIcono.stopAnimation();
     opacidadCredito.stopAnimation();
+    opacidadCapa.stopAnimation();
     opacidadIcono.setValue(1);
     escalaIcono.setValue(1);
     opacidadCredito.setValue(1);
+    opacidadCapa.setValue(1);
   };
 
   const salir = () => {
     if (saliendo.current) {
+      return;
+    }
+
+    if (!preferenciaLista.current) {
+      salidaPendiente.current = true;
       return;
     }
 
@@ -82,12 +101,7 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
       return;
     }
 
-    Animated.timing(opacidadCapa, {
-      toValue: 0,
-      duration: DURACION_SALIDA_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: controladorNativo,
-    }).start(({ finished }) => {
+    animar(opacidadCapa, 0, DURACION_SALIDA_MS).start(({ finished }) => {
       if (finished) {
         terminar();
       }
@@ -98,10 +112,16 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
   salirRef.current = salir;
 
   const intentarEntrada = () => {
-    if (!imagenLista.current || entradaHecha.current || saliendo.current || reducirRef.current) {
-      if (reducirRef.current) {
-        mostrarQuieto();
-      }
+    if (!imagenLista.current || !preferenciaLista.current) {
+      return;
+    }
+
+    if (reducirRef.current) {
+      mostrarQuieto();
+      return;
+    }
+
+    if (entradaHecha.current || saliendo.current) {
       return;
     }
 
@@ -111,25 +131,9 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
     opacidadCredito.setValue(0);
 
     Animated.parallel([
-      Animated.timing(opacidadIcono, {
-        toValue: 1,
-        duration: DURACION_ICONO_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: controladorNativo,
-      }),
-      Animated.timing(escalaIcono, {
-        toValue: 1,
-        duration: DURACION_ICONO_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: controladorNativo,
-      }),
-      Animated.timing(opacidadCredito, {
-        toValue: 1,
-        duration: DURACION_CREDITO_MS,
-        delay: DEMORA_CREDITO_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: controladorNativo,
-      }),
+      animar(opacidadIcono, 1, DURACION_ICONO_MS),
+      animar(escalaIcono, 1, DURACION_ICONO_MS),
+      animar(opacidadCredito, 1, DURACION_CREDITO_MS, DEMORA_CREDITO_MS),
     ]).start();
   };
 
@@ -145,42 +149,53 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
     let vivo = true;
 
     const aplicarMovimiento = (reducirMovimiento: boolean) => {
-      if (!vivo) {
+      if (!vivo || preferenciaLista.current) {
         return;
       }
 
       reducirRef.current = reducirMovimiento;
+      preferenciaLista.current = true;
 
       if (reducirMovimiento) {
         entradaHecha.current = true;
-        opacidadCapa.stopAnimation();
         mostrarQuieto();
-        if (saliendo.current) {
-          terminar();
-        }
-        return;
+      } else {
+        intentarEntradaRef.current();
       }
 
-      intentarEntradaRef.current();
+      if (salidaPendiente.current) {
+        salirRef.current();
+      }
     };
 
-    const consulta =
-      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        ? window.matchMedia('(prefers-reduced-motion: reduce)')
-        : null;
-
-    if (consulta) {
-      aplicarMovimiento(consulta.matches);
+    const inicial = reducirMovimientoInicial();
+    if (inicial != null) {
+      aplicarMovimiento(inicial);
     } else {
       AccessibilityInfo.isReduceMotionEnabled()
         .then(aplicarMovimiento)
         .catch(() => aplicarMovimiento(false));
     }
 
-    const suscripcion = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      aplicarMovimiento,
-    );
+    const suscripcion = AccessibilityInfo.addEventListener('reduceMotionChanged', (reducirMovimiento) => {
+      if (!vivo) {
+        return;
+      }
+
+      reducirRef.current = reducirMovimiento;
+      preferenciaLista.current = true;
+
+      if (reducirMovimiento) {
+        entradaHecha.current = true;
+        if (saliendo.current) {
+          opacidadCapa.stopAnimation();
+          terminar();
+          return;
+        }
+
+        mostrarQuieto();
+      }
+    });
 
     return () => {
       vivo = false;
@@ -191,52 +206,51 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
   const logo = paleta.esquema === 'oscuro' ? logoOscuro : logoClaro;
 
   return (
-    <View style={[estilos.pantalla, { backgroundColor: paleta.fondo }]}>
-      <StatusBar style={paleta.esquema === 'oscuro' ? 'light' : 'dark'} />
-      <Animated.View style={[estilos.capa, { opacity: opacidadCapa }]} pointerEvents="none">
-        <View style={estilos.iconoZona}>
-          <Animated.View
-            style={{
-              opacity: opacidadIcono,
-              transform: [{ scale: escalaIcono }],
-            }}
-          >
-            <Image
-              source={icono}
-              style={estilos.icono}
-              contentFit="contain"
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel="Cuéntame"
-              onDisplay={() => {
-                imagenLista.current = true;
-                intentarEntradaRef.current();
-              }}
-            />
-          </Animated.View>
-        </View>
+    <Animated.View
+      style={[estilos.pantalla, { backgroundColor: paleta.fondo, opacity: opacidadCapa }]}
+    >
+      <View style={estilos.iconoZona}>
         <Animated.View
-          style={[
-            estilos.credito,
-            {
-              opacity: opacidadCredito,
-              paddingBottom: Math.max(insets.bottom, 16),
-              paddingLeft: Math.max(insets.left, 24),
-              paddingRight: Math.max(insets.right, 24),
-            },
-          ]}
+          style={{
+            opacity: opacidadIcono,
+            transform: [{ scale: escalaIcono }],
+          }}
         >
           <Image
-            source={logo}
-            style={estilos.logo}
+            source={icono}
+            style={estilos.icono}
             contentFit="contain"
-            accessible={false}
-            importantForAccessibility="no"
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel="Cuéntame"
+            onDisplay={() => {
+              imagenLista.current = true;
+              intentarEntradaRef.current();
+            }}
           />
-          <Text style={[estilos.linea, { color: paleta.credito }]}>
-            AI For Devs Jr. 5 — Grupo 12
-          </Text>
         </Animated.View>
+      </View>
+      <Animated.View
+        style={[
+          estilos.credito,
+          {
+            opacity: opacidadCredito,
+            paddingBottom: Math.max(insets.bottom, 16),
+            paddingLeft: Math.max(insets.left, 24),
+            paddingRight: Math.max(insets.right, 24),
+          },
+        ]}
+      >
+        <Image
+          source={logo}
+          style={estilos.logo}
+          contentFit="contain"
+          accessible={false}
+          importantForAccessibility="no"
+        />
+        <Text style={[estilos.linea, { color: paleta.credito }]}>
+          AI For Devs Jr. 5 — Grupo 12
+        </Text>
       </Animated.View>
       <Pressable
         style={estilos.toque}
@@ -244,7 +258,7 @@ export function PantallaSplash({ alTerminar }: Propiedades) {
         accessibilityRole="button"
         accessibilityLabel="continuar"
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -256,9 +270,6 @@ const estilos = StyleSheet.create({
     bottom: 0,
     left: 0,
     zIndex: 2,
-  },
-  capa: {
-    flex: 1,
   },
   iconoZona: {
     flex: 1,
