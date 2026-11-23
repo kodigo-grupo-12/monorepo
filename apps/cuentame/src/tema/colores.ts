@@ -3,4 +3,7 @@ export const paleta = {
   fondo: '#1C1C1E',
   texto: '#F4F7F5',
   credito: '#C5CDC8',
+  verdeCarrusel: '#2E7D32',
+  punto: '#787C80',
+  textoSuave: '#A3AAA7',
 } as const;

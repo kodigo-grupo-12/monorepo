@@ -28,6 +28,6 @@ pnpm start
 pnpm typecheck
 ```
 
-`pnpm start` es el único servidor. La pantalla «Cuéntame» se ve en el navegador y, con el teléfono en la misma red, en Expo Go del SDK 58. No se usa la carpeta nativa de Android.
+`pnpm start` es el único servidor. Sin sesión, el splash deja ver el carrusel en el navegador y, con el teléfono en la misma red, en Expo Go del SDK 58. No se usa la carpeta nativa de Android.
 
 Lint, los tests automáticos y el build formal quedan fuera de esta tarea.
