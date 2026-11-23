@@ -1,0 +1,15 @@
+{
+  "name": "raiz",
+  "private": true,
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "turbo run start --filter=cuentame",
+    "typecheck": "turbo run typecheck --filter=cuentame"
+  },
+  "devDependencies": {
+    "turbo": "^2.7.4"
+  }
+}
