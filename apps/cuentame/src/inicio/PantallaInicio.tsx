@@ -8,10 +8,13 @@ export function PantallaInicio() {
   const enrutador = useRouter();
 
   useEffect(() => {
-    const suscripcion = BackHandler.addEventListener('hardwareBackPress', () => true);
-
-    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+    if (Platform.OS !== 'web') {
+      const suscripcion = BackHandler.addEventListener('hardwareBackPress', () => true);
       return () => suscripcion.remove();
+    }
+
+    if (typeof window === 'undefined') {
+      return;
     }
 
     const quedarse = () => {
@@ -23,7 +26,6 @@ export function PantallaInicio() {
     window.addEventListener('popstate', quedarse);
 
     return () => {
-      suscripcion.remove();
       window.removeEventListener('popstate', quedarse);
     };
   }, [enrutador]);
