@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 
 import { Navbar } from '../../nav/Navbar';
+import { ModalAgregarTransaccion } from '../../transacciones/ModalAgregarTransaccion';
 import { usarSesion } from '../../sesion/ProveedorSesion';
 import { paleta } from '../../tema/colores';
 
@@ -10,6 +12,7 @@ import { paleta } from '../../tema/colores';
 // el carrusel y el login siguen sin navbar.
 export default function DisposicionSesion() {
   const { cargando, activa } = usarSesion();
+  const [modalAbierto, setModalAbierto] = useState(false);
 
   if (cargando) {
     return <View style={{ flex: 1, backgroundColor: paleta.fondo }} />;
@@ -27,7 +30,14 @@ export default function DisposicionSesion() {
           contentStyle: { backgroundColor: paleta.fondo },
         }}
       />
-      <Navbar />
+      <Navbar alTocarCentral={() => setModalAbierto(true)} />
+      {/* El modal de agregar transacción es la única excepción a la regla
+          del navbar (T006): por ser de pantalla completa lo tapa. La X
+          cierra sin guardar y regresa a donde estaba la persona. */}
+      <ModalAgregarTransaccion
+        visible={modalAbierto}
+        alCerrar={() => setModalAbierto(false)}
+      />
     </View>
   );
 }
