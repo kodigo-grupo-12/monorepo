@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
+
+const glifoAgente = require('../../assets/glifos/agente.png');
 
 // Anatomia copiada de navbar-template.png (kodigo-grupo-12/.github, Assets/navbar):
 // cinco posiciones en el orden del modelo, con Inicio como tab activo. Estático:
@@ -52,21 +55,13 @@ function GlifoTransacciones({ activo = false }: PropsGlifo) {
 }
 
 function GlifoAgente({ activo = false }: PropsGlifo) {
-  const color = activo ? paleta.texto : paleta.textoSuave;
-
+  // El inactivo se atenúa para leerse en los dos estados con el mismo asset.
   return (
-    <View style={estilos.glifo}>
-      {activo ? (
-        <View style={[estilos.burbuja, { backgroundColor: color }]} />
-      ) : (
-        <View style={[estilos.burbuja, { borderColor: color, borderWidth: 2 }]} />
-      )}
-      {activo ? (
-        <View style={[estilos.colaLlena, { borderLeftColor: color }]} />
-      ) : (
-        <View style={[estilos.colaContorno, { borderColor: color }]} />
-      )}
-    </View>
+    <Image
+      source={glifoAgente}
+      style={[estilos.glifoAgente, { opacity: activo ? 1 : 0.55 }]}
+      contentFit="contain"
+    />
   );
 }
 
@@ -237,30 +232,9 @@ const estilos = StyleSheet.create({
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
   },
-  burbuja: {
-    width: 18,
-    height: 13,
-    borderRadius: 6,
-  },
-  colaLlena: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 6,
-    borderLeftWidth: 7,
-    borderTopColor: 'transparent',
-    alignSelf: 'flex-start',
-    marginLeft: 3,
-    marginTop: -3,
-  },
-  colaContorno: {
-    width: 8,
-    height: 8,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    alignSelf: 'flex-start',
-    marginLeft: 2,
-    marginTop: -6,
-    transform: [{ rotate: '45deg' }],
+  glifoAgente: {
+    width: 24,
+    height: 24,
   },
   cabeza: {
     width: 9,
