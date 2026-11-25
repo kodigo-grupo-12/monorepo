@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
@@ -99,7 +99,12 @@ function Posicion({
   children: ReactNode;
 }) {
   return (
-    <View style={estilos.posicion}>
+    <Pressable
+      style={estilos.posicion}
+      accessibilityRole="tab"
+      accessibilityLabel={etiqueta}
+      accessibilityState={{ selected: activa }}
+    >
       {children}
       <Text
         numberOfLines={1}
@@ -112,7 +117,7 @@ function Posicion({
       >
         {etiqueta}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -128,9 +133,13 @@ export function Navbar() {
         <GlifoTransacciones />
       </Posicion>
       <View style={[estilos.posicion, estilos.posicionCentral]}>
-        <View style={estilos.botonCentral}>
+        <Pressable
+          style={estilos.botonCentral}
+          accessibilityRole="button"
+          accessibilityLabel="Nueva transacción"
+        >
           <Text style={estilos.mas}>+</Text>
-        </View>
+        </Pressable>
       </View>
       <Posicion etiqueta="Agente">
         <GlifoAgente />
@@ -284,7 +293,7 @@ const estilos = StyleSheet.create({
     backgroundColor: paleta.verdeLogin,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
+    shadowColor: paleta.sombra,
     shadowOpacity: 0.25,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
