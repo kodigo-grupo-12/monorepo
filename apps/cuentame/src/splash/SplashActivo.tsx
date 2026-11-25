@@ -11,6 +11,6 @@ export function ProveedorSplash({ activo, children }: Propiedades) {
   return <Contexto.Provider value={activo}>{children}</Contexto.Provider>;
 }
 
-export function usarSplashActivo() {
+export function useSplashActivo() {
   return useContext(Contexto);
 }

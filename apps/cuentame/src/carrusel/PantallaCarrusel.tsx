@@ -11,14 +11,14 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { usarSplashActivo } from '../splash/SplashActivo';
+import { useSplashActivo } from '../splash/SplashActivo';
 import { reducirMovimientoInicial } from '../splash/reducirMovimientoInicial';
 import { paleta } from '../tema/colores';
 import { laminas, SEGUNDO_MS } from './laminas';
 
 const icono = require('../../assets/marca/icono.png');
 
-function usarReducirMovimiento() {
+function useReducirMovimiento() {
   const inicial = reducirMovimientoInicial();
   const [reducir, setReducir] = useState(inicial ?? false);
 
@@ -39,8 +39,8 @@ function usarReducirMovimiento() {
 export function PantallaCarrusel() {
   const enrutador = useRouter();
   const insets = useSafeAreaInsets();
-  const reducir = usarReducirMovimiento();
-  const splashEncima = usarSplashActivo();
+  const reducir = useReducirMovimiento();
+  const splashEncima = useSplashActivo();
   const [indice, setIndice] = useState(0);
   const [ciclo, setCiclo] = useState(0);
   const indiceRef = useRef(0);
