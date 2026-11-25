@@ -14,6 +14,8 @@ export const paleta = {
   textoSuave: '#A3AAA7',
   teal: '#26A69A',
   rojo: '#E53935',
+  dialogo: '#3A3A3C',
+  dialogoBoton: '#48484A',
   banner: '#8E8E93',
   bannerSombra: '#6E6E73',
   separador: '#2C2C2E',

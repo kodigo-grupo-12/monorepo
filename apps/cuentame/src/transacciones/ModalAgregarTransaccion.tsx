@@ -22,6 +22,8 @@ import { useCategorias } from '../datos/useCategorias';
 import { crearCartera } from '../datos/carteras';
 import { useCarteras } from '../datos/useCarteras';
 import { IconoBilletera } from '../carteras/IconoBilletera';
+import { actualizarTransaccion } from '../datos/transacciones';
+import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 
 const TOPE_B64 = 700 * 1024;
@@ -57,16 +59,20 @@ async function comprimirFoto(uri: string): Promise<string | undefined> {
   return undefined;
 }
 
-type PropsModal = { visible: boolean; alCerrar: () => void };
+type PropsModal = { visible: boolean; alCerrar: () => void; transaccion?: Transaccion };
 
 type Vista = 'form' | 'categoria' | 'cartera';
 
 // Modal «Agregar transacción» (T006): pantalla completa, sin navbar, que abre
 // el + del navbar. La X cierra sin guardar; Guardar escribe en Firestore y
 // cierra sin confirmación. El selector de categoría (T007) vive dentro del
-// mismo modal con alta rápida inline y guarda categoria_id. El modal sigue
-// sin navbar: única excepción a la regla de la T005.
-export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
+// mismo modal con alta rápida inline y guarda categoria_id. En modo edición
+// (ADR-0012) recibe el documento precargado y no se duplica el modal. El
+// modal sigue sin navbar: única excepción a la regla de la T005.
+export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: PropsModal) {
+  // La presencia del documento define el modo: la X cierra sin guardar en
+  // los dos modos.
+  const enEdicion = !!transaccion;
   const margenes = useSafeAreaInsets();
   const [tipo, setTipo] = useState<TipoTransaccion>('gasto');
   const [montoTexto, setMontoTexto] = useState('');
@@ -87,21 +93,38 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
   const { carteras } = useCarteras();
   const carteraSeleccionada = carteras.find((cartera) => cartera.id === carteraId);
 
-  // Cada visita arranca limpia: la X cierra sin guardar nada.
+  // Crear arranca limpio; editar precarga el documento tocado. La fecha se
+  // construye por partes para que la zona horaria no corra el día. La X
+  // cierra sin guardar nada en los dos modos.
   useEffect(() => {
-    if (visible) {
-      setTipo('gasto');
-      setMontoTexto('');
-      setNotaTexto('');
-      setFoto(undefined);
-      setFecha(new Date());
-      setVista('form');
-      setCategoriaId(undefined);
-      setNuevaCategoria('');
-      setCarteraId(undefined);
-      setNuevaCartera('');
+    if (!visible) {
+      return;
     }
-  }, [visible]);
+    if (transaccion) {
+      setTipo(transaccion.tipo);
+      setMontoTexto(`${transaccion.monto}`);
+      setNotaTexto(transaccion.nota ?? '');
+      setFoto(transaccion.imagen);
+      const [anio, mes, dia] = transaccion.fecha.split('-').map(Number);
+      setFecha(new Date(anio, mes - 1, dia));
+      setCategoriaId(transaccion.categoria_id);
+      setCarteraId(transaccion.cartera_id);
+      setVista('form');
+      setNuevaCategoria('');
+      setNuevaCartera('');
+      return;
+    }
+    setTipo('gasto');
+    setMontoTexto('');
+    setNotaTexto('');
+    setFoto(undefined);
+    setFecha(new Date());
+    setVista('form');
+    setCategoriaId(undefined);
+    setNuevaCategoria('');
+    setCarteraId(undefined);
+    setNuevaCartera('');
+  }, [visible, transaccion]);
 
   // Monto: solo dígitos y un punto con hasta dos decimales.
   function alCambiarMonto(texto: string) {
@@ -177,6 +200,24 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
     if (!montoValido || !categoriaId || !carteraId || guardando) {
       return;
     }
+    if (enEdicion && transaccion?.id) {
+      setGuardando(true);
+      try {
+        await actualizarTransaccion(transaccion.id, {
+          tipo,
+          monto: Number(montoTexto),
+          nota: notaTexto.trim() ? notaTexto.trim() : undefined,
+          fecha: fechaISO(fecha),
+          imagen: foto,
+          categoria_id: categoriaId,
+          cartera_id: carteraId,
+        });
+        alCerrar();
+      } finally {
+        setGuardando(false);
+      }
+      return;
+    }
     setGuardando(true);
     try {
       await crearTransaccion({
@@ -228,7 +269,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
             )}
           </View>
           <Text style={[estilos.titulo, { color: paleta.texto }]}>
-            {vista === 'categoria' ? 'Categoría' : vista === 'cartera' ? 'Cartera' : 'Agregar transacción'}
+            {vista === 'categoria'
+              ? 'Categoría'
+              : vista === 'cartera'
+                ? 'Cartera'
+                : enEdicion
+                  ? 'Editar transacción'
+                  : 'Agregar transacción'}
           </Text>
           <View style={estilos.ranura} />
         </View>
@@ -458,6 +505,17 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
                 </View>
               </Pressable>
             </View>
+
+            {enEdicion && foto ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Quitar imagen"
+                onPress={() => setFoto(undefined)}
+                style={estilos.quitar}
+              >
+                <Text style={[estilos.quitarTexto, { color: paleta.rojo }]}>Quitar imagen</Text>
+              </Pressable>
+            ) : null}
 
             <View style={estilos.fila}>
               <View style={estilos.calendario}>
@@ -823,6 +881,16 @@ const estilos = StyleSheet.create({
   },
   pastillaTexto: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  quitar: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 4,
+    marginTop: -4,
+    marginBottom: 10,
+  },
+  quitarTexto: {
+    fontSize: 13,
     fontWeight: '600',
   },
   espacio: {
