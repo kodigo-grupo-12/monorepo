@@ -6,6 +6,8 @@ export const paleta = {
   texto: '#F4F7F5',
   credito: '#C5CDC8',
   verdeCarrusel: '#2E7D32',
+  verdeOscuro: '#1E5A32',
+  verdeMonto: '#3A783D',
   verdeLogin: '#2DB84C',
   puntoInactivo: '#787C80',
   textoSuave: '#A3AAA7',

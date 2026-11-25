@@ -120,13 +120,14 @@ function Posicion({
   );
 }
 
-export function Navbar() {
+export function Navbar({ alTocarCentral }: { alTocarCentral?: () => void }) {
   const margenes = useSafeAreaInsets();
   const camino = usePathname();
   const enrutador = useRouter();
 
   // El tab activo sale de la ruta: tocar un tab navega y el placeholder
-  // compartido responde. El botón central no navega ni toma estado.
+  // compartido responde. El botón central abre el modal «Agregar
+  // transacción», revocando el no-hacer-nada de la T005.
   return (
     <View style={[estilos.barra, { paddingBottom: 6 + margenes.bottom }]}>
       <Posicion
@@ -148,6 +149,7 @@ export function Navbar() {
           style={estilos.botonCentral}
           accessibilityRole="button"
           accessibilityLabel="Nueva transacción"
+          onPress={alTocarCentral}
         >
           <Text style={estilos.mas}>+</Text>
         </Pressable>
