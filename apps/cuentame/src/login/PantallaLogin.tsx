@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cuentaDemo } from '../sesion/cuentaDemo';
-import { usarSesion } from '../sesion/ProveedorSesion';
+import { useSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
 const AVISO_DEMO = 'Ese correo o esa contraseña no son los de la cuenta demo.';
@@ -20,7 +20,7 @@ const AVISO_ETAPA = 'En esta etapa solo entra la cuenta demo.';
 export function PantallaLogin() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
-  const { entrar } = usarSesion();
+  const { entrar } = useSesion();
   const desplazamiento = useRef<ComponentRef<typeof ScrollView>>(null);
   const entrando = useRef(false);
   const [correo, setCorreo] = useState<string>(cuentaDemo.correo);
