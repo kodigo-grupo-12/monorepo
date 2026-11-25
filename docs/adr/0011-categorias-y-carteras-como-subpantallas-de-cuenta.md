@@ -1,0 +1,7 @@
+# Las categorías y las carteras viven como sub-pantallas de Cuenta
+
+Decisión aceptada el 2026-11-25. La app registraba transacciones sin categorías reales y con la cartera fija en «Efectivo». Se deciden dos colecciones propias al patrón de la T006: «categorias» con documentos {nombre, tipo: gasto|ingreso} y «carteras» con documentos {nombre}, ambas con listener en tiempo real. Las categorías son planas y globales: sin jerarquía, sin pertenencia a una cartera. El esquema de «transacciones» gana categoria_id y cartera_id; el saldo de cada cartera se calcula en vivo sumando sus transacciones (ingresos menos gastos) y nunca se guarda en el documento.
+
+La gestión vive en el tab Cuenta: las filas «Categorías» y «Mis carteras» empujan sus pantallas dentro del stack del tab, con navbar visible; crear categoría y cartera tiene una pantalla dedicada cada una. Dentro del modal del + la alta rápida es inline: fila «+ Nueva…» con input, sin salir del modal. Editar y borrar categorías o carteras, los candados y las categorías inactivas quedan fuera del MVP.
+
+Se consideró guardar el saldo en el documento de la cartera. Se descartó: se desincronizaría con las transacciones y la demo exige saldos en vivo. Consecuencias: las semillas de la T006 se reconcilian por las 14 categorías de producción y la cartera Efectivo (los nombres de ejemplo dejan de valer); el saldo de una cartera sin transacciones es $0.00; las transacciones viejas sin cartera_id no suman en ningún saldo.

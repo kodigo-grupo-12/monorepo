@@ -95,7 +95,7 @@ _Avoid_: logout, desloguearse
 ### Las transacciones
 
 **Transacción**:
-Registro de un movimiento de dinero (gasto o ingreso) con monto, nota, fecha, cuenta, categoría opcional e imagen opcional.
+Registro de un movimiento de dinero (gasto o ingreso) con monto, nota, fecha, cuenta, categoría, cartera e imagen opcionales.
 _Avoid_: movimiento, registro contable
 
 **Gasto**:
@@ -110,10 +110,6 @@ _Avoid_: entrada, abono
 Cifra de la transacción, mayor a 0 y con máximo 2 decimales, en USD.
 _Avoid_: cantidad, importe
 
-**Cartera**:
-Origen del dinero de una transacción; en el MVP queda fija en «Efectivo».
-_Avoid_: billetera, wallet
-
 **Nota**:
 Texto opcional que describe la transacción.
 _Avoid_: comentario, descripción
@@ -123,7 +119,7 @@ Imagen opcional de galería, comprimida en el dispositivo y guardada en base64 d
 _Avoid_: recibo, archivo adjunto
 
 **Semillas**:
-Las cinco transacciones de demostración que pueblan una colección vacía.
+Los datos de demostración que pueblan las colecciones vacías: las 14 categorías de producción, la cartera Efectivo y las transacciones de demo (el Salario más los 5 gastos).
 _Avoid_: datos de prueba, fixtures
 
 **Sincronización en tiempo real**:
@@ -133,3 +129,25 @@ _Avoid_: polling, actualización automática
 **Modal de agregar transacción**:
 Pantalla a pantalla completa, sin navbar, que abre el + del navbar y guarda una transacción.
 _Avoid_: formulario, diálogo
+
+### Las categorías y las carteras
+
+**Categoría**:
+Etiqueta plana de una transacción: tiene nombre y tipo (gasto o ingreso). Es global, no pertenece a carteras, y no tiene jerarquía ni sub-niveles.
+_Avoid_: tag, clasificación
+
+**Cartera**:
+Contenedor de dinero del usuario (Efectivo, un banco...). Su saldo nunca se guarda en el documento: se calcula sumando sus transacciones.
+_Avoid_: billetera, wallet
+
+**Saldo calculado**:
+Ingresos menos gastos de una cartera, agregado en vivo desde el snapshot de transacciones.
+_Avoid_: saldo guardado, balance
+
+**Alta rápida**:
+Crear una categoría o una cartera sin salir del picker del modal del +.
+_Avoid_: creación express, flujo corto
+
+**Pantalla empujada**:
+Sub-pantalla dentro del stack del tab Cuenta, con navbar visible, a diferencia del modal del + que no lo lleva.
+_Avoid_: sub-pantalla, pantalla anidada
