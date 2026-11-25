@@ -95,10 +95,12 @@ function Fila({
   etiqueta,
   icono,
   alTocar,
+  color = paleta.texto,
 }: {
   etiqueta: string;
   icono: ReactNode;
   alTocar?: () => void;
+  color?: string;
 }) {
   return (
     <Pressable
@@ -108,7 +110,7 @@ function Fila({
       onPress={alTocar}
     >
       {icono}
-      <Text style={[estilos.filaEtiqueta, { color: paleta.texto }]}>{etiqueta}</Text>
+      <Text style={[estilos.filaEtiqueta, { color }]}>{etiqueta}</Text>
       <IconoChevron />
     </Pressable>
   );
@@ -185,7 +187,7 @@ export function PantallaCuenta() {
       </View>
 
       <View style={estilos.grupoSalida}>
-        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={cerrarSesion} />
+        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={cerrarSesion} color={paleta.rojo} />
       </View>
     </ScrollView>
   );
