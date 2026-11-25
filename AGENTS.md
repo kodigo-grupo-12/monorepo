@@ -12,6 +12,12 @@ Five canonical roles: `needs-triage`, `needs-info`, `ready-for-agent`, `wontfix`
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Hooks y sesión
+
+Los hooks propios se llaman `use` más un nombre en español (`useSesion`, `useSplashActivo`), nunca `usar*`. El compilador de React solo reconoce los nombres que siguen el patrón de React: `use` seguido de una mayúscula o un dígito (`/^use[A-Z0-9]/`). El prefijo `use` no se traduce.
+
+No se anida un segundo proveedor de sesión dentro de un componente que ya consume la sesión. Queda un solo proveedor, en la disposición raíz, compartido por el recorrido de bienvenida y por las pantallas.
+
 ## Validación rápida
 
 Desde la raíz, con Node 22.13 o más. `pnpm start` no termina, así que el typecheck va en otra terminal:

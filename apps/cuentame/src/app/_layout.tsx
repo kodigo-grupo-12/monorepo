@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,14 +14,22 @@ import { paleta } from '../tema/colores';
 function Recorrido() {
   const { activa } = useSesion();
   const [splashActivo, setSplashActivo] = useState(true);
-  const antes = useRef(activa);
+  const [cicloSplash, setCicloSplash] = useState(0);
+  const [activaVista, setActivaVista] = useState(activa);
 
-  useEffect(() => {
-    if (antes.current && !activa) {
+  // El cierre tiene que cubrir en el mismo render en que `activa` pasa a
+  // false. Un efecto corre después del paint y deja ver el carrusel; el
+  // compilador de React también puede saltárselo. Ajuste de estado durante
+  // el render (docs de React): si la sesión acaba de cerrarse, el splash
+  // vuelve antes de pintar y se remonta para que el temporizador arranque
+  // de cero.
+  if (activa !== activaVista) {
+    setActivaVista(activa);
+    if (activaVista && !activa) {
       setSplashActivo(true);
+      setCicloSplash((n) => n + 1);
     }
-    antes.current = activa;
-  }, [activa]);
+  }
 
   return (
     <ProveedorSplash activo={splashActivo}>
@@ -42,7 +50,7 @@ function Recorrido() {
         />
       </View>
       {splashActivo ? (
-        <PantallaSplash alTerminar={() => setSplashActivo(false)} />
+        <PantallaSplash key={cicloSplash} alTerminar={() => setSplashActivo(false)} />
       ) : null}
     </View>
     </ProveedorSplash>
