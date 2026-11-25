@@ -9,4 +9,9 @@ export const paleta = {
   verdeLogin: '#2DB84C',
   puntoInactivo: '#787C80',
   textoSuave: '#A3AAA7',
+  teal: '#26A69A',
+  rojo: '#E53935',
+  banner: '#8E8E93',
+  bannerSombra: '#6E6E73',
+  separador: '#2C2C2E',
 } as const;
