@@ -1,4 +1,4 @@
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export type TipoTransaccion = 'gasto' | 'ingreso';
@@ -27,4 +27,8 @@ export async function crearTransaccion(transaccion: Omit<Transaccion, 'id' | 'cu
   const documento = Object.fromEntries(entradas);
   const referencia = await addDoc(coleccionTransacciones, documento);
   return referencia.id;
+}
+
+export async function eliminarTransaccion(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'transacciones', id));
 }
