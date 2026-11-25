@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, deleteField, doc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export type TipoTransaccion = 'gasto' | 'ingreso';
@@ -31,4 +31,18 @@ export async function crearTransaccion(transaccion: Omit<Transaccion, 'id' | 'cu
 
 export async function eliminarTransaccion(id: string): Promise<void> {
   await deleteDoc(doc(db, 'transacciones', id));
+}
+
+// Actualiza el documento con el mismo id (ADR-0012). Un opcional que llega
+// indefinido (nota vacía, imagen quitada) se borra del documento en vez de
+// quedarse con su valor viejo.
+export async function actualizarTransaccion(
+  id: string,
+  cambios: Omit<Transaccion, 'id' | 'cuenta'>,
+): Promise<void> {
+  const documento: Record<string, unknown> = {};
+  for (const [clave, valor] of Object.entries(cambios)) {
+    documento[clave] = valor === undefined ? deleteField() : valor;
+  }
+  await updateDoc(doc(db, 'transacciones', id), documento);
 }

@@ -22,6 +22,7 @@ import { useCategorias } from '../datos/useCategorias';
 import { crearCartera } from '../datos/carteras';
 import { useCarteras } from '../datos/useCarteras';
 import { IconoBilletera } from '../carteras/IconoBilletera';
+import { actualizarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 
@@ -199,9 +200,22 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
     if (!montoValido || !categoriaId || !carteraId || guardando) {
       return;
     }
-    if (enEdicion) {
-      // El guardado de la edición (updateDoc del mismo documento) llega con
-      // el ticket de guardar (#67): en este commit editar todavía no escribe.
+    if (enEdicion && transaccion?.id) {
+      setGuardando(true);
+      try {
+        await actualizarTransaccion(transaccion.id, {
+          tipo,
+          monto: Number(montoTexto),
+          nota: notaTexto.trim() ? notaTexto.trim() : undefined,
+          fecha: fechaISO(fecha),
+          imagen: foto,
+          categoria_id: categoriaId,
+          cartera_id: carteraId,
+        });
+        alCerrar();
+      } finally {
+        setGuardando(false);
+      }
       return;
     }
     setGuardando(true);
@@ -491,6 +505,17 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                 </View>
               </Pressable>
             </View>
+
+            {enEdicion && foto ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Quitar imagen"
+                onPress={() => setFoto(undefined)}
+                style={estilos.quitar}
+              >
+                <Text style={[estilos.quitarTexto, { color: paleta.rojo }]}>Quitar imagen</Text>
+              </Pressable>
+            ) : null}
 
             <View style={estilos.fila}>
               <View style={estilos.calendario}>
@@ -856,6 +881,16 @@ const estilos = StyleSheet.create({
   },
   pastillaTexto: {
     fontSize: 14,
+    fontWeight: '600',
+  },
+  quitar: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 4,
+    marginTop: -4,
+    marginBottom: 10,
+  },
+  quitarTexto: {
+    fontSize: 13,
     fontWeight: '600',
   },
   espacio: {
