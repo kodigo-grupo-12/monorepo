@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
@@ -87,10 +88,12 @@ function GlifoCuenta({ activo = false }: PropsGlifo) {
 function Posicion({
   etiqueta,
   activa = false,
+  alTocar,
   children,
 }: {
   etiqueta: string;
   activa?: boolean;
+  alTocar?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -99,6 +102,7 @@ function Posicion({
       accessibilityRole="tab"
       accessibilityLabel={etiqueta}
       accessibilityState={{ selected: activa }}
+      onPress={alTocar}
     >
       {children}
       <Text
@@ -118,14 +122,26 @@ function Posicion({
 
 export function Navbar() {
   const margenes = useSafeAreaInsets();
+  const camino = usePathname();
+  const enrutador = useRouter();
 
+  // El tab activo sale de la ruta: tocar un tab navega y el placeholder
+  // compartido responde. El botón central no navega ni toma estado.
   return (
     <View style={[estilos.barra, { paddingBottom: 6 + margenes.bottom }]}>
-      <Posicion etiqueta="Inicio" activa>
-        <GlifoInicio activo />
+      <Posicion
+        etiqueta="Inicio"
+        activa={camino === '/inicio'}
+        alTocar={() => enrutador.navigate('/inicio')}
+      >
+        <GlifoInicio activo={camino === '/inicio'} />
       </Posicion>
-      <Posicion etiqueta="Transacciones">
-        <GlifoTransacciones />
+      <Posicion
+        etiqueta="Transacciones"
+        activa={camino === '/transacciones'}
+        alTocar={() => enrutador.navigate('/transacciones')}
+      >
+        <GlifoTransacciones activo={camino === '/transacciones'} />
       </Posicion>
       <View style={[estilos.posicion, estilos.posicionCentral]}>
         <Pressable
@@ -136,11 +152,19 @@ export function Navbar() {
           <Text style={estilos.mas}>+</Text>
         </Pressable>
       </View>
-      <Posicion etiqueta="Agente">
-        <GlifoAgente />
+      <Posicion
+        etiqueta="Agente"
+        activa={camino === '/agente'}
+        alTocar={() => enrutador.navigate('/agente')}
+      >
+        <GlifoAgente activo={camino === '/agente'} />
       </Posicion>
-      <Posicion etiqueta="Cuenta">
-        <GlifoCuenta />
+      <Posicion
+        etiqueta="Cuenta"
+        activa={camino === '/cuenta'}
+        alTocar={() => enrutador.navigate('/cuenta')}
+      >
+        <GlifoCuenta activo={camino === '/cuenta'} />
       </Posicion>
     </View>
   );
