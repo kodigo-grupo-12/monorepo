@@ -1,7 +1,6 @@
-import { PantallaInicio } from '../../inicio/PantallaInicio';
+import { PantallaPlaceholder } from '../../desarrollo/PantallaPlaceholder';
 
-// Placeholder compartido: las cuatro rutas apuntan a la misma pantalla
-// hasta que lleguen las pantallas propias de cada sección.
-export default function PantallaSeccion() {
-  return <PantallaInicio />;
+// Raíz de tab: el placeholder sin botón de atrás.
+export default function RutaAgente() {
+  return <PantallaPlaceholder />;
 }

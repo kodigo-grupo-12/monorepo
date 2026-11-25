@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cuentaDemo } from '../sesion/cuentaDemo';
@@ -114,6 +115,8 @@ function Fila({
 
 export function PantallaCuenta() {
   const margenes = useSafeAreaInsets();
+  const enrutador = useRouter();
+  const verDesarrollo = () => enrutador.push('/desarrollo');
 
   return (
     <ScrollView
@@ -126,6 +129,7 @@ export function PantallaCuenta() {
           style={estilos.encabezadoSoporte}
           accessibilityRole="button"
           accessibilityLabel="Soporte"
+          onPress={verDesarrollo}
         >
           <Text style={[estilos.encabezadoSoporteTexto, { color: paleta.texto }]}>Soporte</Text>
           <IconoSigno signo="?" />
@@ -137,6 +141,7 @@ export function PantallaCuenta() {
         style={estilos.perfil}
         accessibilityRole="button"
         accessibilityLabel={`Perfil de ${cuentaDemo.nombre}`}
+        onPress={verDesarrollo}
       >
         <View style={estilos.perfilCentro}>
           <View style={[estilos.avatar, { backgroundColor: paleta.teal }]}>
@@ -156,18 +161,18 @@ export function PantallaCuenta() {
       </Pressable>
 
       <View>
-        <Fila etiqueta="Mis carteras" icono={<IconoCartera />} />
+        <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Categorías" icono={<IconoCaja />} />
+        <Fila etiqueta="Categorías" icono={<IconoCaja />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
       <View style={estilos.grupo}>
-        <Fila etiqueta="Soporte" icono={<IconoSigno signo="?" />} />
+        <Fila etiqueta="Soporte" icono={<IconoSigno signo="?" />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} />
+        <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Acerca" icono={<IconoSigno signo="!" />} />
+        <Fila etiqueta="Acerca" icono={<IconoSigno signo="!" />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
