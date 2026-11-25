@@ -128,7 +128,11 @@ export function Navbar({ alTocarCentral }: { alTocarCentral?: () => void }) {
   // Las pantallas empujadas dentro del tab Cuenta (ADR-0011) mantienen a
   // Cuenta como tab activo.
   const enCuenta =
-    camino === '/cuenta' || camino === '/categorias' || camino === '/nueva-categoria';
+    camino === '/cuenta' ||
+    camino === '/categorias' ||
+    camino === '/nueva-categoria' ||
+    camino === '/carteras' ||
+    camino === '/nueva-cartera';
 
   // El tab activo sale de la ruta: tocar un tab navega y el placeholder
   // compartido responde. El botón central abre el modal «Agregar

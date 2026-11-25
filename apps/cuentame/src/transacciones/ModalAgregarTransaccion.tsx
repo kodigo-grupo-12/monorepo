@@ -19,6 +19,9 @@ import { crearTransaccion } from '../datos/transacciones';
 import type { TipoTransaccion } from '../datos/transacciones';
 import { crearCategoria } from '../datos/categorias';
 import { useCategorias } from '../datos/useCategorias';
+import { crearCartera } from '../datos/carteras';
+import { useCarteras } from '../datos/useCarteras';
+import { IconoBilletera } from '../carteras/IconoBilletera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 
 const TOPE_B64 = 700 * 1024;
@@ -56,7 +59,7 @@ async function comprimirFoto(uri: string): Promise<string | undefined> {
 
 type PropsModal = { visible: boolean; alCerrar: () => void };
 
-type Vista = 'form' | 'categoria';
+type Vista = 'form' | 'categoria' | 'cartera';
 
 // Modal «Agregar transacción» (T006): pantalla completa, sin navbar, que abre
 // el + del navbar. La X cierra sin guardar; Guardar escribe en Firestore y
@@ -75,10 +78,14 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
   const [categoriaId, setCategoriaId] = useState<string>();
   const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [creandoAlta, setCreandoAlta] = useState(false);
+  const [carteraId, setCarteraId] = useState<string>();
+  const [nuevaCartera, setNuevaCartera] = useState('');
 
   const { categorias } = useCategorias();
   const delTipo = categorias.filter((categoria) => categoria.tipo === tipo);
   const categoriaSeleccionada = categorias.find((categoria) => categoria.id === categoriaId);
+  const { carteras } = useCarteras();
+  const carteraSeleccionada = carteras.find((cartera) => cartera.id === carteraId);
 
   // Cada visita arranca limpia: la X cierra sin guardar nada.
   useEffect(() => {
@@ -91,6 +98,8 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
       setVista('form');
       setCategoriaId(undefined);
       setNuevaCategoria('');
+      setCarteraId(undefined);
+      setNuevaCartera('');
     }
   }, [visible]);
 
@@ -147,8 +156,25 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
     }
   }
 
+  // Alta rápida inline de cartera (ADR-0011): crea y la deja seleccionada.
+  async function crearAltaRapidaCartera() {
+    const nombre = nuevaCartera.trim();
+    if (!nombre || creandoAlta) {
+      return;
+    }
+    setCreandoAlta(true);
+    try {
+      const id = await crearCartera(nombre);
+      setCarteraId(id);
+      setNuevaCartera('');
+      setVista('form');
+    } finally {
+      setCreandoAlta(false);
+    }
+  }
+
   async function guardar() {
-    if (!montoValido || !categoriaId || guardando) {
+    if (!montoValido || !categoriaId || !carteraId || guardando) {
       return;
     }
     setGuardando(true);
@@ -160,6 +186,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
         fecha: fechaISO(fecha),
         imagen: foto,
         categoria_id: categoriaId,
+        cartera_id: carteraId,
       });
       alCerrar();
     } finally {
@@ -201,7 +228,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
             )}
           </View>
           <Text style={[estilos.titulo, { color: paleta.texto }]}>
-            {vista === 'categoria' ? 'Categoría' : 'Agregar transacción'}
+            {vista === 'categoria' ? 'Categoría' : vista === 'cartera' ? 'Cartera' : 'Agregar transacción'}
           </Text>
           <View style={estilos.ranura} />
         </View>
@@ -262,6 +289,62 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
               </Pressable>
             </View>
           </ScrollView>
+        ) : vista === 'cartera' ? (
+          <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+            {carteras.map((cartera, indice) => (
+              <View key={cartera.id}>
+                <Pressable
+                  style={estilos.filaPicker}
+                  accessibilityRole="button"
+                  accessibilityLabel={cartera.nombre}
+                  onPress={() => {
+                    setCarteraId(cartera.id);
+                    setVista('form');
+                  }}
+                >
+                  <IconoBilletera />
+                  <Text style={[estilos.filaTexto, { color: paleta.texto, flex: 1 }]} numberOfLines={1}>
+                    {cartera.nombre}
+                  </Text>
+                  {cartera.id === carteraId ? <View style={[estilos.marcado, { backgroundColor: paleta.verdeLogin }]} /> : null}
+                </Pressable>
+                {indice < carteras.length - 1 ? (
+                  <View style={[estilos.lineaPicker, { backgroundColor: paleta.separador }]} />
+                ) : null}
+              </View>
+            ))}
+
+            <View style={estilos.filaAlta}>
+              <View style={[estilos.circuloNueva, { backgroundColor: paleta.verdeAccion }]}>
+                <Text style={estilos.masNueva}>+</Text>
+              </View>
+              <TextInput
+                style={[estilos.entradaAlta, { color: paleta.texto }]}
+                value={nuevaCartera}
+                onChangeText={setNuevaCartera}
+                placeholder="Nueva cartera"
+                placeholderTextColor={paleta.textoSuave}
+                onSubmitEditing={crearAltaRapidaCartera}
+                returnKeyType="done"
+                accessibilityLabel="Nueva cartera"
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Agregar"
+                disabled={!nuevaCartera.trim() || creandoAlta}
+                onPress={crearAltaRapidaCartera}
+              >
+                <Text
+                  style={[
+                    estilos.textoAlta,
+                    { color: nuevaCartera.trim() ? paleta.verdeAccion : paleta.textoSuave },
+                  ]}
+                >
+                  Agregar
+                </Text>
+              </Pressable>
+            </View>
+          </ScrollView>
         ) : (
           <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
             <View style={estilos.selector}>
@@ -286,12 +369,29 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
               ))}
             </View>
 
-            <View style={estilos.fila}>
-              <View style={estilos.billetera}>
-                <View style={estilos.billeteraMoneda} />
-              </View>
-              <Text style={[estilos.filaTexto, { color: paleta.texto }]}>Efectivo</Text>
-            </View>
+            <Pressable
+              style={estilos.fila}
+              accessibilityRole="button"
+              accessibilityLabel={carteraSeleccionada ? carteraSeleccionada.nombre : 'Seleccione cartera'}
+              onPress={() => setVista('cartera')}
+            >
+              {carteraSeleccionada ? (
+                <IconoBilletera />
+              ) : (
+                <View style={estilos.billetera}>
+                  <View style={estilos.billeteraMoneda} />
+                </View>
+              )}
+              <Text
+                style={[
+                  estilos.filaTexto,
+                  { color: carteraSeleccionada ? paleta.texto : paleta.textoSuave, flex: 1 },
+                ]}
+              >
+                {carteraSeleccionada ? carteraSeleccionada.nombre : 'Seleccione cartera'}
+              </Text>
+              <View style={estilos.chevron} />
+            </Pressable>
 
             <View style={estilos.monto}>
               <View style={estilos.badge}>
@@ -394,19 +494,19 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
           <Pressable
             style={[
               estilos.guardar,
-              montoValido && categoriaId ? { backgroundColor: paleta.verdeLogin } : { backgroundColor: paleta.superficie },
+              montoValido && categoriaId && carteraId ? { backgroundColor: paleta.verdeLogin } : { backgroundColor: paleta.superficie },
               { marginBottom: 24 + margenes.bottom },
             ]}
             accessibilityRole="button"
             accessibilityLabel="Guardar"
-            accessibilityState={{ disabled: !montoValido || !categoriaId || guardando }}
-            disabled={!montoValido || !categoriaId || guardando}
+            accessibilityState={{ disabled: !montoValido || !categoriaId || !carteraId || guardando }}
+            disabled={!montoValido || !categoriaId || !carteraId || guardando}
             onPress={guardar}
           >
             <Text
               style={[
                 estilos.guardarTexto,
-                { color: montoValido && categoriaId ? paleta.texto : paleta.textoSuave },
+                { color: montoValido && categoriaId && carteraId ? paleta.texto : paleta.textoSuave },
               ]}
             >
               Guardar
