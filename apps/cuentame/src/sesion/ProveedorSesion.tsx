@@ -51,10 +51,10 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   return <Contexto.Provider value={{ cargando, activa, entrar, salir }}>{children}</Contexto.Provider>;
 }
 
-export function usarSesion(): EstadoDeSesion {
+export function useSesion(): EstadoDeSesion {
   const valor = useContext(Contexto);
   if (!valor) {
-    throw new Error('usarSesion va dentro de ProveedorSesion');
+    throw new Error('useSesion va dentro de ProveedorSesion');
   }
   return valor;
 }

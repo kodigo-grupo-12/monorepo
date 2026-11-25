@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { ProveedorSesion, usarSesion } from '../sesion/ProveedorSesion';
+import { ProveedorSesion, useSesion } from '../sesion/ProveedorSesion';
 import { ProveedorSplash } from '../splash/SplashActivo';
 import { PantallaSplash } from '../splash/PantallaSplash';
 import { paleta } from '../tema/colores';
@@ -12,7 +12,7 @@ import { paleta } from '../tema/colores';
 // vuelve a cubrirla cuando la sesión se cierra, para reiniciar el recorrido
 // completo (splash, carrusel y login) sin recargar nada (ADR-0008).
 function Recorrido() {
-  const { activa } = usarSesion();
+  const { activa } = useSesion();
   const [splashActivo, setSplashActivo] = useState(true);
   const antes = useRef(activa);
 
@@ -24,7 +24,6 @@ function Recorrido() {
   }, [activa]);
 
   return (
-    <ProveedorSesion>
     <ProveedorSplash activo={splashActivo}>
     <View style={{ flex: 1, backgroundColor: paleta.fondo }}>
       <StatusBar style="light" />
@@ -47,7 +46,6 @@ function Recorrido() {
       ) : null}
     </View>
     </ProveedorSplash>
-    </ProveedorSesion>
   );
 }
 
