@@ -9,6 +9,7 @@ export const paleta = {
   verdeOscuro: '#1E5A32',
   verdeMonto: '#3A783D',
   verdeLogin: '#2DB84C',
+  verdeAccion: '#4CAF50',
   puntoInactivo: '#787C80',
   textoSuave: '#A3AAA7',
   teal: '#26A69A',
