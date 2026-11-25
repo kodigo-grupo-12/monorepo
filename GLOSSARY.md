@@ -130,6 +130,22 @@ _Avoid_: polling, actualización automática
 Pantalla a pantalla completa, sin navbar, que abre el + del navbar y guarda una transacción.
 _Avoid_: formulario, diálogo
 
+**Papelera**:
+El icono verde al borde derecho de cada fila de Inicio. Tocarla pide confirmación antes de borrar la transacción; nunca borra directo.
+_Avoid_: trash, icono de borrado, botón eliminar
+
+**Diálogo de confirmación**:
+La tarjeta «¿Eliminar transacción?» que abre la papelera: fondo oscurecido, la transacción identificada por nota y monto, Eliminar en rojo y Cancelar en gris. Cancelar no toca nada y no hay deshacer.
+_Avoid_: alert, modal de borrado, confirmación nativa
+
+**Modo edición**:
+El mismo modal del + reutilizado para corregir una transacción existente: título «Editar transacción», campos precargados y Guardar actualiza el documento con el mismo id.
+_Avoid_: formulario de edición, modal de editar
+
+**Precarga**:
+Llenar los campos del modal en modo edición con los datos del documento tocado antes de que la persona toque nada.
+_Avoid_: estado inicial, valores por defecto
+
 ### Las categorías y las carteras
 
 **Categoría**:
