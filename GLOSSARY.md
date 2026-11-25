@@ -167,3 +167,15 @@ _Avoid_: creación express, flujo corto
 **Pantalla empujada**:
 Sub-pantalla dentro del stack del tab Cuenta, con navbar visible, a diferencia del modal del + que no lo lleva.
 _Avoid_: sub-pantalla, pantalla anidada
+
+**Pages**:
+El servicio de GitHub que sirve sitios estáticos por CDN con HTTPS, sin servidor propio. La demo web de Cuéntame se publica ahí en cada verde de main.
+_Avoid_: gh-pages, hosting
+
+**Bundle web**:
+El HTML y el JavaScript que produce expo export --platform web y que corre en el navegador. Es 100% estático: los datos llegan por el SDK web desde Firestore.
+_Avoid_: build web, compilado
+
+**Export**:
+El comando que convierte la app en el bundle web (expo export --platform web). El de Pages corre con PAGES_DEPLOY=1 para ajustar el modo single y el baseUrl.
+_Avoid_: build de producción, deploy
