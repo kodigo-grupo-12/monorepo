@@ -17,6 +17,7 @@ import { useTransacciones } from '../datos/useTransacciones';
 import { useCategorias } from '../datos/useCategorias';
 import { eliminarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
+import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 
 export function PantallaInicio() {
   const enrutador = useRouter();
@@ -28,6 +29,9 @@ export function PantallaInicio() {
   // nada y no hay deshacer (ADR-0012).
   const [pendiente, setPendiente] = useState<Transaccion>();
   const [eliminando, setEliminando] = useState(false);
+  // Tocar la fila (fuera de la papelera) abre el modal en modo edición con
+  // el documento precargado (ADR-0012).
+  const [seleccionada, setSeleccionada] = useState<Transaccion>();
 
   async function confirmarEliminacion() {
     if (!pendiente?.id || eliminando) {
@@ -76,6 +80,7 @@ export function PantallaInicio() {
             <FilaTransaccion
               transaccion={item}
               nombreCategoria={item.categoria_id ? nombresDeCategoria.get(item.categoria_id) : undefined}
+              alEditar={() => setSeleccionada(item)}
               alEliminar={() => setPendiente(item)}
             />
           )}
@@ -132,6 +137,12 @@ export function PantallaInicio() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ModalAgregarTransaccion
+        visible={!!seleccionada}
+        alCerrar={() => setSeleccionada(undefined)}
+        transaccion={seleccionada}
+      />
     </View>
   );
 }
@@ -142,14 +153,21 @@ export function PantallaInicio() {
 function FilaTransaccion({
   transaccion,
   nombreCategoria,
+  alEditar,
   alEliminar,
 }: {
   transaccion: Transaccion;
   nombreCategoria?: string;
+  alEditar: () => void;
   alEliminar: () => void;
 }) {
   return (
-    <View style={estilos.fila}>
+    <Pressable
+      style={estilos.fila}
+      accessibilityRole="button"
+      accessibilityLabel="Editar transacción"
+      onPress={alEditar}
+    >
       <Text style={[estilos.fecha, { color: paleta.textoSuave }]}>{transaccion.fecha}</Text>
       <View style={estilos.detalles}>
         <Text style={[estilos.nota, { color: paleta.texto }]} numberOfLines={1}>
@@ -171,7 +189,7 @@ function FilaTransaccion({
       >
         <GlifoPapelera />
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
