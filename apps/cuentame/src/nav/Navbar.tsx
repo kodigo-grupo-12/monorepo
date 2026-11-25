@@ -8,10 +8,10 @@ import { paleta } from '../tema/colores';
 
 const glifoAgente = require('../../assets/glifos/agente.png');
 
-// Anatomia copiada de navbar-template.png (kodigo-grupo-12/.github, Assets/navbar):
-// cinco posiciones en el orden del modelo, con Inicio como tab activo. Estático:
-// tocar no hace nada todavía; la navegación llega con el ticket #32. Los glifos
-// van dibujados con vistas: Expo SDK 58 ya no trae un set de iconos y no se
+// Anatomía copiada de navbar-template.png (kodigo-grupo-12/.github, Assets/navbar):
+// cinco posiciones en el orden del modelo. El tab activo sale de la ruta y
+// tocar navega. Los glifos van dibujados con vistas, salvo el del Agente, que
+// es un asset del proyecto: Expo SDK 58 ya no trae un set de iconos y no se
 // agrega ninguna dependencia nueva ni nada se pide por URL.
 
 type PropsGlifo = { activo?: boolean };
