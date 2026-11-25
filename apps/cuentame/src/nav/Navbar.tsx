@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
 
-// Anatomia copiada de navbar-template.png (kodigo-grupo-12/.github, Assets/navbar):
-// cinco posiciones en el orden del modelo, con Inicio como tab activo. Estático:
-// tocar no hace nada todavía; la navegación llega con el ticket #32. Los glifos
-// van dibujados con vistas: Expo SDK 58 ya no trae un set de iconos y no se
+const glifoAgente = require('../../assets/glifos/agente.png');
+
+// Anatomía copiada de navbar-template.png (kodigo-grupo-12/.github, Assets/navbar):
+// cinco posiciones en el orden del modelo. El tab activo sale de la ruta y
+// tocar navega. Los glifos van dibujados con vistas, salvo el del Agente, que
+// es un asset del proyecto: Expo SDK 58 ya no trae un set de iconos y no se
 // agrega ninguna dependencia nueva ni nada se pide por URL.
 
 type PropsGlifo = { activo?: boolean };
@@ -52,21 +56,13 @@ function GlifoTransacciones({ activo = false }: PropsGlifo) {
 }
 
 function GlifoAgente({ activo = false }: PropsGlifo) {
-  const color = activo ? paleta.texto : paleta.textoSuave;
-
+  // El inactivo se atenúa para leerse en los dos estados con el mismo asset.
   return (
-    <View style={estilos.glifo}>
-      {activo ? (
-        <View style={[estilos.burbuja, { backgroundColor: color }]} />
-      ) : (
-        <View style={[estilos.burbuja, { borderColor: color, borderWidth: 2 }]} />
-      )}
-      {activo ? (
-        <View style={[estilos.colaLlena, { borderLeftColor: color }]} />
-      ) : (
-        <View style={[estilos.colaContorno, { borderColor: color }]} />
-      )}
-    </View>
+    <Image
+      source={glifoAgente}
+      style={[estilos.glifoAgente, { opacity: activo ? 1 : 0.55 }]}
+      contentFit="contain"
+    />
   );
 }
 
@@ -92,14 +88,22 @@ function GlifoCuenta({ activo = false }: PropsGlifo) {
 function Posicion({
   etiqueta,
   activa = false,
+  alTocar,
   children,
 }: {
   etiqueta: string;
   activa?: boolean;
+  alTocar?: () => void;
   children: ReactNode;
 }) {
   return (
-    <View style={estilos.posicion}>
+    <Pressable
+      style={estilos.posicion}
+      accessibilityRole="tab"
+      accessibilityLabel={etiqueta}
+      accessibilityState={{ selected: activa }}
+      onPress={alTocar}
+    >
       {children}
       <Text
         numberOfLines={1}
@@ -112,31 +116,55 @@ function Posicion({
       >
         {etiqueta}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
 export function Navbar() {
   const margenes = useSafeAreaInsets();
+  const camino = usePathname();
+  const enrutador = useRouter();
 
+  // El tab activo sale de la ruta: tocar un tab navega y el placeholder
+  // compartido responde. El botón central no navega ni toma estado.
   return (
     <View style={[estilos.barra, { paddingBottom: 6 + margenes.bottom }]}>
-      <Posicion etiqueta="Inicio" activa>
-        <GlifoInicio activo />
+      <Posicion
+        etiqueta="Inicio"
+        activa={camino === '/inicio'}
+        alTocar={() => enrutador.navigate('/inicio')}
+      >
+        <GlifoInicio activo={camino === '/inicio'} />
       </Posicion>
-      <Posicion etiqueta="Transacciones">
-        <GlifoTransacciones />
+      <Posicion
+        etiqueta="Transacciones"
+        activa={camino === '/transacciones'}
+        alTocar={() => enrutador.navigate('/transacciones')}
+      >
+        <GlifoTransacciones activo={camino === '/transacciones'} />
       </Posicion>
       <View style={[estilos.posicion, estilos.posicionCentral]}>
-        <View style={estilos.botonCentral}>
+        <Pressable
+          style={estilos.botonCentral}
+          accessibilityRole="button"
+          accessibilityLabel="Nueva transacción"
+        >
           <Text style={estilos.mas}>+</Text>
-        </View>
+        </Pressable>
       </View>
-      <Posicion etiqueta="Agente">
-        <GlifoAgente />
+      <Posicion
+        etiqueta="Agente"
+        activa={camino === '/agente'}
+        alTocar={() => enrutador.navigate('/agente')}
+      >
+        <GlifoAgente activo={camino === '/agente'} />
       </Posicion>
-      <Posicion etiqueta="Cuenta">
-        <GlifoCuenta />
+      <Posicion
+        etiqueta="Cuenta"
+        activa={camino === '/cuenta'}
+        alTocar={() => enrutador.navigate('/cuenta')}
+      >
+        <GlifoCuenta activo={camino === '/cuenta'} />
       </Posicion>
     </View>
   );
@@ -228,30 +256,9 @@ const estilos = StyleSheet.create({
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
   },
-  burbuja: {
-    width: 18,
-    height: 13,
-    borderRadius: 6,
-  },
-  colaLlena: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 6,
-    borderLeftWidth: 7,
-    borderTopColor: 'transparent',
-    alignSelf: 'flex-start',
-    marginLeft: 3,
-    marginTop: -3,
-  },
-  colaContorno: {
-    width: 8,
-    height: 8,
-    borderBottomWidth: 2,
-    borderLeftWidth: 2,
-    alignSelf: 'flex-start',
-    marginLeft: 2,
-    marginTop: -6,
-    transform: [{ rotate: '45deg' }],
+  glifoAgente: {
+    width: 24,
+    height: 24,
   },
   cabeza: {
     width: 9,
@@ -284,7 +291,7 @@ const estilos = StyleSheet.create({
     backgroundColor: paleta.verdeLogin,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
+    shadowColor: paleta.sombra,
     shadowOpacity: 0.25,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },

@@ -1,12 +1,13 @@
 import { View } from 'react-native';
+import { Redirect } from 'expo-router';
 
 import { PantallaCarrusel } from '../carrusel/PantallaCarrusel';
-import { PantallaInicio } from '../inicio/PantallaInicio';
-import { Navbar } from '../nav/Navbar';
 import { usarSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
-export default function PantallaSegunSesion() {
+// Compuerta de la sesión: sin sesión, carrusel; con sesión, el grupo con
+// navbar. El montaje del navbar vive en el layout del grupo con sesión.
+export default function Entrada() {
   const { cargando, activa } = usarSesion();
 
   if (cargando) {
@@ -14,14 +15,7 @@ export default function PantallaSegunSesion() {
   }
 
   if (activa) {
-    // El navbar se monta una sola vez aquí, donde la app decide la sesión:
-    // no se repite por pantalla y no aparece en el carrusel ni en el login.
-    return (
-      <View style={{ flex: 1, backgroundColor: paleta.fondo }}>
-        <PantallaInicio />
-        <Navbar />
-      </View>
-    );
+    return <Redirect href="/inicio" />;
   }
 
   return <PantallaCarrusel />;
