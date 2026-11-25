@@ -1,18 +1,22 @@
-import { useEffect } from 'react';
-import { BackHandler, FlatList, Platform, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { BackHandler, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
 import { useTransacciones } from '../datos/useTransacciones';
 import { useCategorias } from '../datos/useCategorias';
+import { eliminarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
+import { IconoPapelera } from './IconoPapelera';
+import { DialogoEliminarTransaccion } from './DialogoEliminarTransaccion';
 
 export function PantallaInicio() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
   const { transacciones, cargando } = useTransacciones();
   const { categorias } = useCategorias();
+  const [porEliminar, setPorEliminar] = useState<Transaccion | null>(null);
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   useEffect(() => {
@@ -46,7 +50,11 @@ export function PantallaInicio() {
           data={transacciones}
           keyExtractor={(transaccion) => transaccion.id ?? `${transaccion.fecha}-${transaccion.monto}`}
           renderItem={({ item }) => (
-            <FilaTransaccion transaccion={item} nombreCategoria={item.categoria_id ? nombresDeCategoria.get(item.categoria_id) : undefined} />
+            <FilaTransaccion
+              transaccion={item}
+              nombreCategoria={item.categoria_id ? nombresDeCategoria.get(item.categoria_id) : undefined}
+              alEliminar={setPorEliminar}
+            />
           )}
           contentContainerStyle={estilos.lista}
           ListEmptyComponent={
@@ -56,18 +64,35 @@ export function PantallaInicio() {
           }
         />
       )}
+      <DialogoEliminarTransaccion
+        transaccion={porEliminar}
+        alCancelar={() => setPorEliminar(null)}
+        alEliminar={(transaccion) => {
+          // El borrado es de ida: sin deshacer. El listener refresca la lista
+          // y los saldos calculados al instante; la foto va con el documento.
+          setPorEliminar(null);
+          if (transaccion.id) {
+            eliminarTransaccion(transaccion.id).catch((error) => {
+              console.error('No se pudo eliminar la transacción:', error);
+            });
+          }
+        }}
+      />
     </View>
   );
 }
 
-// Fila de la lista en tiempo real: fecha, nota, monto en USD y la categoría
-// solo cuando la transacción la lleva.
+// Fila de la lista en tiempo real: fecha, nota, monto en USD, la categoría
+// solo cuando la transacción la lleva, y la papelera de eliminar al borde
+// derecho (T008).
 function FilaTransaccion({
   transaccion,
   nombreCategoria,
+  alEliminar,
 }: {
   transaccion: Transaccion;
   nombreCategoria?: string;
+  alEliminar: (transaccion: Transaccion) => void;
 }) {
   return (
     <View style={estilos.fila}>
@@ -83,6 +108,15 @@ function FilaTransaccion({
         ) : null}
       </View>
       <Text style={[estilos.monto, { color: paleta.texto }]}>${transaccion.monto.toFixed(2)}</Text>
+      <Pressable
+        style={estilos.papelera}
+        accessibilityRole="button"
+        accessibilityLabel="Eliminar transacción"
+        hitSlop={8}
+        onPress={() => alEliminar(transaccion)}
+      >
+        <IconoPapelera />
+      </Pressable>
     </View>
   );
 }
@@ -132,5 +166,8 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
+  },
+  papelera: {
+    padding: 2,
   },
 });

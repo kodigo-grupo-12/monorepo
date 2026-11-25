@@ -1,4 +1,4 @@
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export type TipoTransaccion = 'gasto' | 'ingreso';
@@ -27,4 +27,11 @@ export async function crearTransaccion(transaccion: Omit<Transaccion, 'id' | 'cu
   const documento = Object.fromEntries(entradas);
   const referencia = await addDoc(coleccionTransacciones, documento);
   return referencia.id;
+}
+
+// Elimina el documento entero; la foto adjunta se va con él, porque la imagen
+// vive en base64 dentro del documento (ADR-0009). Sin deshacer: el listener
+// refresca la lista y los saldos calculados al instante.
+export async function eliminarTransaccion(id: string): Promise<void> {
+  await deleteDoc(doc(coleccionTransacciones, id));
 }
