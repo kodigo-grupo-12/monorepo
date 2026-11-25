@@ -91,3 +91,45 @@ _Avoid_: snackbar, notificación, alerta
 **Cerrar sesión**:
 La acción que borra la sesión guardada y regresa al splash con el carrusel y el login.
 _Avoid_: logout, desloguearse
+
+### Las transacciones
+
+**Transacción**:
+Registro de un movimiento de dinero (gasto o ingreso) con monto, nota, fecha, cuenta, categoría opcional e imagen opcional.
+_Avoid_: movimiento, registro contable
+
+**Gasto**:
+Transacción que sale de la cartera.
+_Avoid_: egreso
+
+**Ingreso**:
+Transacción que entra a la cartera.
+_Avoid_: entrada, abono
+
+**Monto**:
+Cifra de la transacción, mayor a 0 y con máximo 2 decimales, en USD.
+_Avoid_: cantidad, importe
+
+**Cartera**:
+Origen del dinero de una transacción; en el MVP queda fija en «Efectivo».
+_Avoid_: billetera, wallet
+
+**Nota**:
+Texto opcional que describe la transacción.
+_Avoid_: comentario, descripción
+
+**Foto adjunta**:
+Imagen opcional de galería, comprimida en el dispositivo y guardada en base64 dentro del documento.
+_Avoid_: recibo, archivo adjunto
+
+**Semillas**:
+Las cinco transacciones de demostración que pueblan una colección vacía.
+_Avoid_: datos de prueba, fixtures
+
+**Sincronización en tiempo real**:
+Escucha de Firestore (listener) que muestra lo guardado en todos los dispositivos sin recargar.
+_Avoid_: polling, actualización automática
+
+**Modal de agregar transacción**:
+Pantalla a pantalla completa, sin navbar, que abre el + del navbar y guarda una transacción.
+_Avoid_: formulario, diálogo
