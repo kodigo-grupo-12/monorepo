@@ -34,3 +34,14 @@ export async function leerSesion(): Promise<boolean> {
 export async function guardarSesion(): Promise<void> {
   await escribirMarca();
 }
+
+export async function borrarSesion(): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (enWeb()) {
+      localStorage.removeItem(CLAVE);
+    }
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(CLAVE);
+}

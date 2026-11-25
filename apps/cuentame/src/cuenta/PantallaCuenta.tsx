@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cuentaDemo } from '../sesion/cuentaDemo';
+import { usarSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
 // Anatomía copiada de Assets/cuenta/modelo-pantalla-cuenta.png
@@ -116,7 +117,14 @@ function Fila({
 export function PantallaCuenta() {
   const margenes = useSafeAreaInsets();
   const enrutador = useRouter();
+  const { salir } = usarSesion();
   const verDesarrollo = () => enrutador.push('/desarrollo');
+
+  // Sin confirmación (ADR-0008): al borrar la marca, la guardia del grupo con
+  // sesión manda a la entrada y el splash reinicia el recorrido completo.
+  const cerrarSesion = async () => {
+    await salir();
+  };
 
   return (
     <ScrollView
@@ -177,7 +185,7 @@ export function PantallaCuenta() {
       </View>
 
       <View style={estilos.grupoSalida}>
-        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} />
+        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={cerrarSesion} />
       </View>
     </ScrollView>
   );
