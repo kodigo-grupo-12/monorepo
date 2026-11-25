@@ -5,12 +5,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
 import { useTransacciones } from '../datos/useTransacciones';
+import { useCategorias } from '../datos/useCategorias';
 import type { Transaccion } from '../datos/transacciones';
 
 export function PantallaInicio() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
   const { transacciones, cargando } = useTransacciones();
+  const { categorias } = useCategorias();
+  const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
@@ -42,7 +45,9 @@ export function PantallaInicio() {
         <FlatList
           data={transacciones}
           keyExtractor={(transaccion) => transaccion.id ?? `${transaccion.fecha}-${transaccion.monto}`}
-          renderItem={({ item }) => <FilaTransaccion transaccion={item} />}
+          renderItem={({ item }) => (
+            <FilaTransaccion transaccion={item} nombreCategoria={item.categoria_id ? nombresDeCategoria.get(item.categoria_id) : undefined} />
+          )}
           contentContainerStyle={estilos.lista}
           ListEmptyComponent={
             <Text style={[estilos.vacio, { color: paleta.textoSuave }]}>
@@ -57,7 +62,13 @@ export function PantallaInicio() {
 
 // Fila de la lista en tiempo real: fecha, nota, monto en USD y la categoría
 // solo cuando la transacción la lleva.
-function FilaTransaccion({ transaccion }: { transaccion: Transaccion }) {
+function FilaTransaccion({
+  transaccion,
+  nombreCategoria,
+}: {
+  transaccion: Transaccion;
+  nombreCategoria?: string;
+}) {
   return (
     <View style={estilos.fila}>
       <Text style={[estilos.fecha, { color: paleta.textoSuave }]}>{transaccion.fecha}</Text>
@@ -65,9 +76,9 @@ function FilaTransaccion({ transaccion }: { transaccion: Transaccion }) {
         <Text style={[estilos.nota, { color: paleta.texto }]} numberOfLines={1}>
           {transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
         </Text>
-        {transaccion.categoria ? (
+        {(nombreCategoria ?? transaccion.categoria) ? (
           <Text style={[estilos.categoria, { color: paleta.textoSuave }]} numberOfLines={1}>
-            {transaccion.categoria}
+            {nombreCategoria ?? transaccion.categoria}
           </Text>
         ) : null}
       </View>

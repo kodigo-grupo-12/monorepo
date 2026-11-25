@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Animated,
-  Easing,
   Modal,
   Platform,
   Pressable,
@@ -19,11 +17,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { paleta } from '../tema/colores';
 import { crearTransaccion } from '../datos/transacciones';
 import type { TipoTransaccion } from '../datos/transacciones';
+import { crearCategoria } from '../datos/categorias';
+import { useCategorias } from '../datos/useCategorias';
+import { crearCartera } from '../datos/carteras';
+import { useCarteras } from '../datos/useCarteras';
+import { IconoBilletera } from '../carteras/IconoBilletera';
+import { GlifoCategoria } from '../categorias/GlifoCategoria';
 
-const VISIBLE_MS = 2000;
-const DURACION_MS = 180;
 const TOPE_B64 = 700 * 1024;
-const controladorNativo = Platform.OS !== 'web';
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 function fechaTexto(fecha: Date): string {
@@ -58,9 +59,13 @@ async function comprimirFoto(uri: string): Promise<string | undefined> {
 
 type PropsModal = { visible: boolean; alCerrar: () => void };
 
+type Vista = 'form' | 'categoria' | 'cartera';
+
 // Modal «Agregar transacción» (T006): pantalla completa, sin navbar, que abre
 // el + del navbar. La X cierra sin guardar; Guardar escribe en Firestore y
-// cierra sin confirmación. Anatomía del modelo de .github/Assets/transacciones.
+// cierra sin confirmación. El selector de categoría (T007) vive dentro del
+// mismo modal con alta rápida inline y guarda categoria_id. El modal sigue
+// sin navbar: única excepción a la regla de la T005.
 export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
   const margenes = useSafeAreaInsets();
   const [tipo, setTipo] = useState<TipoTransaccion>('gasto');
@@ -69,8 +74,18 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
   const [foto, setFoto] = useState<string>();
   const [fecha, setFecha] = useState(new Date());
   const [guardando, setGuardando] = useState(false);
-  const toastVisto = useRef(false);
-  const opacidad = useRef(new Animated.Value(0)).current;
+  const [vista, setVista] = useState<Vista>('form');
+  const [categoriaId, setCategoriaId] = useState<string>();
+  const [nuevaCategoria, setNuevaCategoria] = useState('');
+  const [creandoAlta, setCreandoAlta] = useState(false);
+  const [carteraId, setCarteraId] = useState<string>();
+  const [nuevaCartera, setNuevaCartera] = useState('');
+
+  const { categorias } = useCategorias();
+  const delTipo = categorias.filter((categoria) => categoria.tipo === tipo);
+  const categoriaSeleccionada = categorias.find((categoria) => categoria.id === categoriaId);
+  const { carteras } = useCarteras();
+  const carteraSeleccionada = carteras.find((cartera) => cartera.id === carteraId);
 
   // Cada visita arranca limpia: la X cierra sin guardar nada.
   useEffect(() => {
@@ -80,31 +95,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
       setNotaTexto('');
       setFoto(undefined);
       setFecha(new Date());
-      toastVisto.current = false;
+      setVista('form');
+      setCategoriaId(undefined);
+      setNuevaCategoria('');
+      setCarteraId(undefined);
+      setNuevaCartera('');
     }
   }, [visible]);
-
-  // El toast global «En desarrollo», una vez por visita al modal.
-  function mostrarToast() {
-    if (toastVisto.current) {
-      return;
-    }
-    toastVisto.current = true;
-    Animated.timing(opacidad, {
-      toValue: 1,
-      duration: DURACION_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: controladorNativo,
-    }).start();
-    setTimeout(() => {
-      Animated.timing(opacidad, {
-        toValue: 0,
-        duration: DURACION_MS,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: controladorNativo,
-      }).start();
-    }, VISIBLE_MS);
-  }
 
   // Monto: solo dígitos y un punto con hasta dos decimales.
   function alCambiarMonto(texto: string) {
@@ -114,6 +111,14 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
       ? `${partes[0].replace(/\D/g, '')}.${partes.slice(1).join('').replace(/\D/g, '').slice(0, 2)}`
       : conPunto.replace(/\D/g, '');
     setMontoTexto(normalizado);
+  }
+
+  // Al cambiar de tipo, una categoría del otro tipo deja de valer.
+  function alCambiarTipo(valor: TipoTransaccion) {
+    if (categoriaSeleccionada && categoriaSeleccionada.tipo !== valor) {
+      setCategoriaId(undefined);
+    }
+    setTipo(valor);
   }
 
   const montoValido = /^\d+(\.\d{1,2})?$/.test(montoTexto) && Number(montoTexto) > 0;
@@ -133,8 +138,43 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
     }
   }
 
+  // Alta rápida inline (ADR-0011): crea la categoría del tipo activo y la
+  // deja seleccionada, sin salir del modal.
+  async function crearAltaRapida() {
+    const nombre = nuevaCategoria.trim();
+    if (!nombre || creandoAlta) {
+      return;
+    }
+    setCreandoAlta(true);
+    try {
+      const id = await crearCategoria(nombre, tipo);
+      setCategoriaId(id);
+      setNuevaCategoria('');
+      setVista('form');
+    } finally {
+      setCreandoAlta(false);
+    }
+  }
+
+  // Alta rápida inline de cartera (ADR-0011): crea y la deja seleccionada.
+  async function crearAltaRapidaCartera() {
+    const nombre = nuevaCartera.trim();
+    if (!nombre || creandoAlta) {
+      return;
+    }
+    setCreandoAlta(true);
+    try {
+      const id = await crearCartera(nombre);
+      setCarteraId(id);
+      setNuevaCartera('');
+      setVista('form');
+    } finally {
+      setCreandoAlta(false);
+    }
+  }
+
   async function guardar() {
-    if (!montoValido || guardando) {
+    if (!montoValido || !categoriaId || !carteraId || guardando) {
       return;
     }
     setGuardando(true);
@@ -145,6 +185,8 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
         nota: notaTexto.trim() ? notaTexto.trim() : undefined,
         fecha: fechaISO(fecha),
         imagen: foto,
+        categoria_id: categoriaId,
+        cartera_id: carteraId,
       });
       alCerrar();
     } finally {
@@ -153,162 +195,324 @@ export function ModalAgregarTransaccion({ visible, alCerrar }: PropsModal) {
   }
 
   return (
-    <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={alCerrar}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={() => (vista === 'form' ? alCerrar() : setVista('form'))}
+    >
       <View style={[estilos.raiz, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
         <View style={estilos.cabecera}>
           <View style={estilos.ranura}>
-            <Pressable
-              style={estilos.x}
-              accessibilityRole="button"
-              accessibilityLabel="Cerrar"
-              onPress={alCerrar}
-              hitSlop={8}
-            >
-              <View style={estilos.barraX1} />
-              <View style={estilos.barraX2} />
-            </Pressable>
+            {vista === 'form' ? (
+              <Pressable
+                style={estilos.x}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+                onPress={alCerrar}
+                hitSlop={8}
+              >
+                <View style={estilos.barraX1} />
+                <View style={estilos.barraX2} />
+              </Pressable>
+            ) : (
+              <Pressable
+                style={estilos.x}
+                accessibilityRole="button"
+                accessibilityLabel="Volver"
+                onPress={() => setVista('form')}
+                hitSlop={8}
+              >
+                <View style={estilos.atrasPunta} />
+              </Pressable>
+            )}
           </View>
-          <Text style={[estilos.titulo, { color: paleta.texto }]}>Agregar transacción</Text>
+          <Text style={[estilos.titulo, { color: paleta.texto }]}>
+            {vista === 'categoria' ? 'Categoría' : vista === 'cartera' ? 'Cartera' : 'Agregar transacción'}
+          </Text>
           <View style={estilos.ranura} />
         </View>
 
-        <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
-          <View style={estilos.selector}>
-            {(['gasto', 'ingreso'] as const).map((valor) => (
+        {vista === 'categoria' ? (
+          <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+            {delTipo.map((categoria, indice) => (
+              <View key={categoria.id}>
+                <Pressable
+                  style={estilos.filaPicker}
+                  accessibilityRole="button"
+                  accessibilityLabel={categoria.nombre}
+                  onPress={() => {
+                    setCategoriaId(categoria.id);
+                    setVista('form');
+                  }}
+                >
+                  <GlifoCategoria nombre={categoria.nombre} />
+                  <Text style={[estilos.filaTexto, { color: paleta.texto, flex: 1 }]} numberOfLines={1}>
+                    {categoria.nombre}
+                  </Text>
+                  {categoria.id === categoriaId ? <View style={[estilos.marcado, { backgroundColor: paleta.verdeLogin }]} /> : null}
+                </Pressable>
+                {indice < delTipo.length - 1 ? (
+                  <View style={[estilos.lineaPicker, { backgroundColor: paleta.separador }]} />
+                ) : null}
+              </View>
+            ))}
+
+            <View style={estilos.filaAlta}>
+              <View style={[estilos.circuloNueva, { backgroundColor: paleta.verdeAccion }]}>
+                <Text style={estilos.masNueva}>+</Text>
+              </View>
+              <TextInput
+                style={[estilos.entradaAlta, { color: paleta.texto }]}
+                value={nuevaCategoria}
+                onChangeText={setNuevaCategoria}
+                placeholder="Nueva categoría"
+                placeholderTextColor={paleta.textoSuave}
+                onSubmitEditing={crearAltaRapida}
+                returnKeyType="done"
+                accessibilityLabel="Nueva categoría"
+              />
               <Pressable
-                key={valor}
-                style={[estilos.segmento, tipo === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
                 accessibilityRole="button"
-                accessibilityState={{ selected: tipo === valor }}
-                onPress={() => setTipo(valor)}
+                accessibilityLabel="Agregar"
+                disabled={!nuevaCategoria.trim() || creandoAlta}
+                onPress={crearAltaRapida}
               >
                 <Text
                   style={[
-                    estilos.segmentoTexto,
-                    { color: tipo === valor ? paleta.texto : paleta.textoSuave },
-                    tipo === valor && { fontWeight: 'bold' },
+                    estilos.textoAlta,
+                    { color: nuevaCategoria.trim() ? paleta.verdeAccion : paleta.textoSuave },
                   ]}
                 >
-                  {valor === 'gasto' ? 'Gasto' : 'Ingreso'}
+                  Agregar
                 </Text>
               </Pressable>
-            ))}
-          </View>
-
-          <View style={estilos.fila}>
-            <View style={estilos.billetera}>
-              <View style={estilos.billeteraMoneda} />
             </View>
-            <Text style={[estilos.filaTexto, { color: paleta.texto }]}>Efectivo</Text>
-          </View>
-
-          <View style={estilos.monto}>
-            <View style={estilos.badge}>
-              <Text style={[estilos.badgeTexto, { color: paleta.texto }]}>USD</Text>
-            </View>
-            <TextInput
-              style={[estilos.montoEntrada, { color: paleta.verdeMonto }]}
-              value={montoTexto}
-              onChangeText={alCambiarMonto}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor={paleta.textoSuave}
-              accessibilityLabel="Monto"
-            />
-          </View>
-
-          <Pressable
-            style={estilos.fila}
-            accessibilityRole="button"
-            accessibilityLabel="Seleccione categoría"
-            onPress={mostrarToast}
-          >
-            <View style={estilos.circuloCategoria} />
-            <Text style={[estilos.filaTexto, { color: paleta.textoSuave, flex: 1 }]}>
-              Seleccione categoría
-            </Text>
-            <View style={estilos.chevron} />
-          </Pressable>
-
-          <View style={estilos.fila}>
-            <View style={estilos.notas}>
-              <View style={estilos.notaLinea} />
-              <View style={estilos.notaLinea} />
-            </View>
-            <TextInput
-              style={[estilos.notaEntrada, { color: paleta.texto }]}
-              value={notaTexto}
-              onChangeText={setNotaTexto}
-              placeholder="Escribir una nota"
-              placeholderTextColor={paleta.textoSuave}
-              accessibilityLabel="Nota"
-            />
-            {foto ? (
-              <Image source={{ uri: `data:image/jpeg;base64,${foto}` }} style={estilos.miniatura} />
-            ) : null}
-            <Pressable
-              style={[estilos.botonFoto, { backgroundColor: paleta.verdeLogin }]}
-              accessibilityRole="button"
-              accessibilityLabel="Adjuntar foto"
-              onPress={elegirFoto}
-            >
-              <View style={estilos.fotoMarco}>
-                <View style={estilos.fotoSol} />
-                <View style={estilos.fotoMontana} />
+          </ScrollView>
+        ) : vista === 'cartera' ? (
+          <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+            {carteras.map((cartera, indice) => (
+              <View key={cartera.id}>
+                <Pressable
+                  style={estilos.filaPicker}
+                  accessibilityRole="button"
+                  accessibilityLabel={cartera.nombre}
+                  onPress={() => {
+                    setCarteraId(cartera.id);
+                    setVista('form');
+                  }}
+                >
+                  <IconoBilletera />
+                  <Text style={[estilos.filaTexto, { color: paleta.texto, flex: 1 }]} numberOfLines={1}>
+                    {cartera.nombre}
+                  </Text>
+                  {cartera.id === carteraId ? <View style={[estilos.marcado, { backgroundColor: paleta.verdeLogin }]} /> : null}
+                </Pressable>
+                {indice < carteras.length - 1 ? (
+                  <View style={[estilos.lineaPicker, { backgroundColor: paleta.separador }]} />
+                ) : null}
               </View>
-            </Pressable>
-          </View>
+            ))}
 
-          <View style={estilos.fila}>
-            <View style={estilos.calendario}>
-              <View style={estilos.calendarioPinIzquierdo} />
-              <View style={estilos.calendarioPinDerecho} />
-              <View style={estilos.calendarioLinea} />
+            <View style={estilos.filaAlta}>
+              <View style={[estilos.circuloNueva, { backgroundColor: paleta.verdeAccion }]}>
+                <Text style={estilos.masNueva}>+</Text>
+              </View>
+              <TextInput
+                style={[estilos.entradaAlta, { color: paleta.texto }]}
+                value={nuevaCartera}
+                onChangeText={setNuevaCartera}
+                placeholder="Nueva cartera"
+                placeholderTextColor={paleta.textoSuave}
+                onSubmitEditing={crearAltaRapidaCartera}
+                returnKeyType="done"
+                accessibilityLabel="Nueva cartera"
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Agregar"
+                disabled={!nuevaCartera.trim() || creandoAlta}
+                onPress={crearAltaRapidaCartera}
+              >
+                <Text
+                  style={[
+                    estilos.textoAlta,
+                    { color: nuevaCartera.trim() ? paleta.verdeAccion : paleta.textoSuave },
+                  ]}
+                >
+                  Agregar
+                </Text>
+              </Pressable>
             </View>
-            <Pressable
-              style={estilos.flecha}
-              accessibilityRole="button"
-              accessibilityLabel="Día anterior"
-              onPress={() => setFecha(new Date(fecha.getTime() - 86400000))}
-            >
-              <View style={estilos.flechaIzquierda} />
-            </Pressable>
-            <View style={[estilos.pastilla, { backgroundColor: paleta.verdeOscuro }]}>
-              <Text style={[estilos.pastillaTexto, { color: paleta.texto }]}>{fechaTexto(fecha)}</Text>
+          </ScrollView>
+        ) : (
+          <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+            <View style={estilos.selector}>
+              {(['gasto', 'ingreso'] as const).map((valor) => (
+                <Pressable
+                  key={valor}
+                  style={[estilos.segmento, tipo === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: tipo === valor }}
+                  onPress={() => alCambiarTipo(valor)}
+                >
+                  <Text
+                    style={[
+                      estilos.segmentoTexto,
+                      { color: tipo === valor ? paleta.texto : paleta.textoSuave },
+                      tipo === valor && { fontWeight: 'bold' },
+                    ]}
+                  >
+                    {valor === 'gasto' ? 'Gasto' : 'Ingreso'}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
+
             <Pressable
-              style={estilos.flecha}
+              style={estilos.fila}
               accessibilityRole="button"
-              accessibilityLabel="Día siguiente"
-              onPress={() => setFecha(new Date(fecha.getTime() + 86400000))}
+              accessibilityLabel={carteraSeleccionada ? carteraSeleccionada.nombre : 'Seleccione cartera'}
+              onPress={() => setVista('cartera')}
             >
-              <View style={estilos.flechaDerecha} />
+              {carteraSeleccionada ? (
+                <IconoBilletera />
+              ) : (
+                <View style={estilos.billetera}>
+                  <View style={estilos.billeteraMoneda} />
+                </View>
+              )}
+              <Text
+                style={[
+                  estilos.filaTexto,
+                  { color: carteraSeleccionada ? paleta.texto : paleta.textoSuave, flex: 1 },
+                ]}
+              >
+                {carteraSeleccionada ? carteraSeleccionada.nombre : 'Seleccione cartera'}
+              </Text>
+              <View style={estilos.chevron} />
             </Pressable>
-          </View>
 
-          <View style={estilos.espacio} />
-        </ScrollView>
+            <View style={estilos.monto}>
+              <View style={estilos.badge}>
+                <Text style={[estilos.badgeTexto, { color: paleta.texto }]}>USD</Text>
+              </View>
+              <TextInput
+                style={[estilos.montoEntrada, { color: paleta.verdeMonto }]}
+                value={montoTexto}
+                onChangeText={alCambiarMonto}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={paleta.textoSuave}
+                accessibilityLabel="Monto"
+              />
+            </View>
 
-        <Pressable
-          style={[
-            estilos.guardar,
-            montoValido ? { backgroundColor: paleta.verdeLogin } : { backgroundColor: paleta.superficie },
-            { marginBottom: 24 + margenes.bottom },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Guardar"
-          accessibilityState={{ disabled: !montoValido || guardando }}
-          disabled={!montoValido || guardando}
-          onPress={guardar}
-        >
-          <Text style={[estilos.guardarTexto, { color: montoValido ? paleta.texto : paleta.textoSuave }]}>
-            Guardar
-          </Text>
-        </Pressable>
+            <Pressable
+              style={estilos.fila}
+              accessibilityRole="button"
+              accessibilityLabel={categoriaSeleccionada ? categoriaSeleccionada.nombre : 'Seleccione categoría'}
+              onPress={() => setVista('categoria')}
+            >
+              {categoriaSeleccionada ? (
+                <GlifoCategoria nombre={categoriaSeleccionada.nombre} />
+              ) : (
+                <View style={estilos.circuloCategoria} />
+              )}
+              <Text
+                style={[
+                  estilos.filaTexto,
+                  { color: categoriaSeleccionada ? paleta.texto : paleta.textoSuave, flex: 1 },
+                ]}
+              >
+                {categoriaSeleccionada ? categoriaSeleccionada.nombre : 'Seleccione categoría'}
+              </Text>
+              <View style={estilos.chevron} />
+            </Pressable>
 
-        <Animated.View style={[estilos.toast, { opacity: opacidad }]} pointerEvents="none">
-          <Text style={[estilos.toastTexto, { color: paleta.texto }]}>En desarrollo</Text>
-        </Animated.View>
+            <View style={estilos.fila}>
+              <View style={estilos.notas}>
+                <View style={estilos.notaLinea} />
+                <View style={estilos.notaLinea} />
+              </View>
+              <TextInput
+                style={[estilos.notaEntrada, { color: paleta.texto }]}
+                value={notaTexto}
+                onChangeText={setNotaTexto}
+                placeholder="Escribir una nota"
+                placeholderTextColor={paleta.textoSuave}
+                accessibilityLabel="Nota"
+              />
+              {foto ? (
+                <Image source={{ uri: `data:image/jpeg;base64,${foto}` }} style={estilos.miniatura} />
+              ) : null}
+              <Pressable
+                style={[estilos.botonFoto, { backgroundColor: paleta.verdeLogin }]}
+                accessibilityRole="button"
+                accessibilityLabel="Adjuntar foto"
+                onPress={elegirFoto}
+              >
+                <View style={estilos.fotoMarco}>
+                  <View style={estilos.fotoSol} />
+                  <View style={estilos.fotoMontana} />
+                </View>
+              </Pressable>
+            </View>
+
+            <View style={estilos.fila}>
+              <View style={estilos.calendario}>
+                <View style={estilos.calendarioPinIzquierdo} />
+                <View style={estilos.calendarioPinDerecho} />
+                <View style={estilos.calendarioLinea} />
+              </View>
+              <Pressable
+                style={estilos.flecha}
+                accessibilityRole="button"
+                accessibilityLabel="Día anterior"
+                onPress={() => setFecha(new Date(fecha.getTime() - 86400000))}
+              >
+                <View style={estilos.flechaIzquierda} />
+              </Pressable>
+              <View style={[estilos.pastilla, { backgroundColor: paleta.verdeOscuro }]}>
+                <Text style={[estilos.pastillaTexto, { color: paleta.texto }]}>{fechaTexto(fecha)}</Text>
+              </View>
+              <Pressable
+                style={estilos.flecha}
+                accessibilityRole="button"
+                accessibilityLabel="Día siguiente"
+                onPress={() => setFecha(new Date(fecha.getTime() + 86400000))}
+              >
+                <View style={estilos.flechaDerecha} />
+              </Pressable>
+            </View>
+
+            <View style={estilos.espacio} />
+          </ScrollView>
+        )}
+
+        {vista === 'form' ? (
+          <Pressable
+            style={[
+              estilos.guardar,
+              montoValido && categoriaId && carteraId ? { backgroundColor: paleta.verdeLogin } : { backgroundColor: paleta.superficie },
+              { marginBottom: 24 + margenes.bottom },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Guardar"
+            accessibilityState={{ disabled: !montoValido || !categoriaId || !carteraId || guardando }}
+            disabled={!montoValido || !categoriaId || !carteraId || guardando}
+            onPress={guardar}
+          >
+            <Text
+              style={[
+                estilos.guardarTexto,
+                { color: montoValido && categoriaId && carteraId ? paleta.texto : paleta.textoSuave },
+              ]}
+            >
+              Guardar
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </Modal>
   );
@@ -348,6 +552,14 @@ const estilos = StyleSheet.create({
     height: 2,
     backgroundColor: paleta.texto,
     transform: [{ rotate: '-45deg' }],
+  },
+  atrasPunta: {
+    width: 12,
+    height: 12,
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderColor: paleta.texto,
+    transform: [{ rotate: '45deg' }],
   },
   titulo: {
     flex: 1,
@@ -390,6 +602,53 @@ const estilos = StyleSheet.create({
   },
   filaTexto: {
     fontSize: 15,
+  },
+  filaPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 4,
+    paddingVertical: 14,
+  },
+  lineaPicker: {
+    height: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+  },
+  marcado: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  filaAlta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: paleta.separador,
+  },
+  circuloNueva: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  masNueva: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  entradaAlta: {
+    flex: 1,
+    fontSize: 15,
+    padding: 0,
+  },
+  textoAlta: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   billetera: {
     width: 22,
@@ -579,19 +838,5 @@ const estilos = StyleSheet.create({
   guardarTexto: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  toast: {
-    position: 'absolute',
-    alignSelf: 'center',
-    bottom: 96,
-    backgroundColor: paleta.superficie,
-    borderColor: paleta.separador,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  toastTexto: {
-    fontSize: 14,
   },
 });

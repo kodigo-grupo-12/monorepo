@@ -11,7 +11,9 @@ export interface Transaccion {
   nota?: string;
   fecha: string; // YYYY-MM-DD
   cuenta: string;
-  categoria?: string;
+  categoria?: string; // legado de las semillas de la T006
+  categoria_id?: string; // referencia a «categorias» (T007)
+  cartera_id?: string; // referencia a «carteras» (T007)
   imagen?: string; // base64
 }
 

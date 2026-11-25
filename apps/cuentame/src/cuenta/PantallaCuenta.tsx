@@ -121,6 +121,10 @@ export function PantallaCuenta() {
   const enrutador = useRouter();
   const { salir } = usarSesion();
   const verDesarrollo = () => enrutador.push('/desarrollo');
+  // Enmienda puntual a la T005 (ADR-0011): las filas de esta tarea empujan
+  // su pantalla real; el resto de filas sigue con el placeholder.
+  const verCategorias = () => enrutador.push('/categorias');
+  const verCarteras = () => enrutador.push('/carteras');
 
   // Sin confirmación (ADR-0008): al borrar la marca, la guardia del grupo con
   // sesión manda a la entrada y el splash reinicia el recorrido completo.
@@ -171,9 +175,9 @@ export function PantallaCuenta() {
       </Pressable>
 
       <View>
-        <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verDesarrollo} />
+        <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verCarteras} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Categorías" icono={<IconoCaja />} alTocar={verDesarrollo} />
+        <Fila etiqueta="Categorías" icono={<IconoCaja />} alTocar={verCategorias} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
