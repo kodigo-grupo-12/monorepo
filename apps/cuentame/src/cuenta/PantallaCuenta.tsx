@@ -182,7 +182,7 @@ export function PantallaCuenta() {
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
         <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Acerca" icono={<IconoSigno signo="!" />} alTocar={verDesarrollo} />
+        <Fila etiqueta="Acerca" icono={<IconoSigno signo="i" />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
