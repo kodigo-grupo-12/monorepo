@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { cuentaDemo } from '../sesion/cuentaDemo';
-import { usarSesion } from '../sesion/ProveedorSesion';
+import { useSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
 // Anatomía copiada de Assets/cuenta/modelo-pantalla-cuenta.png
@@ -119,7 +119,7 @@ function Fila({
 export function PantallaCuenta() {
   const margenes = useSafeAreaInsets();
   const enrutador = useRouter();
-  const { salir } = usarSesion();
+  const { salir } = useSesion();
   const verDesarrollo = () => enrutador.push('/desarrollo');
   // Enmienda puntual a la T005 (ADR-0011): las filas de esta tarea empujan
   // su pantalla real; el resto de filas sigue con el placeholder.
