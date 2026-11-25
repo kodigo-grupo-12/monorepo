@@ -1,7 +1,5 @@
-import { PantallaInicio } from '../../inicio/PantallaInicio';
+import { PantallaCuenta } from '../../cuenta/PantallaCuenta';
 
-// Placeholder compartido: las cuatro rutas apuntan a la misma pantalla
-// hasta que lleguen las pantallas propias de cada sección.
-export default function PantallaSeccion() {
-  return <PantallaInicio />;
+export default function RutaCuenta() {
+  return <PantallaCuenta />;
 }

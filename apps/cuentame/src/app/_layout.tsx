@@ -1,15 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { ProveedorSesion } from '../sesion/ProveedorSesion';
+import { ProveedorSesion, usarSesion } from '../sesion/ProveedorSesion';
 import { ProveedorSplash } from '../splash/SplashActivo';
 import { PantallaSplash } from '../splash/PantallaSplash';
 import { paleta } from '../tema/colores';
 
-export default function DisposicionRaiz() {
+// El recorrido de bienvenida vive acá: el splash cubre la app al arrancar y
+// vuelve a cubrirla cuando la sesión se cierra, para reiniciar el recorrido
+// completo (splash, carrusel y login) sin recargar nada (ADR-0008).
+function Recorrido() {
+  const { activa } = usarSesion();
   const [splashActivo, setSplashActivo] = useState(true);
+  const antes = useRef(activa);
+
+  useEffect(() => {
+    if (antes.current && !activa) {
+      setSplashActivo(true);
+    }
+    antes.current = activa;
+  }, [activa]);
 
   return (
     <ProveedorSesion>
@@ -35,6 +47,14 @@ export default function DisposicionRaiz() {
       ) : null}
     </View>
     </ProveedorSplash>
+    </ProveedorSesion>
+  );
+}
+
+export default function DisposicionRaiz() {
+  return (
+    <ProveedorSesion>
+      <Recorrido />
     </ProveedorSesion>
   );
 }
