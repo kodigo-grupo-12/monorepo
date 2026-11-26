@@ -91,6 +91,15 @@ Envuelve `firebase deploy --only firestore:rules,firestore:indexes --project kod
 
 `.firebaserc` deja `kodigo-grupo12` como proyecto por defecto. Cualquier comando `firebase` sin `--project` apunta a producción.
 
+### Emuladores para la web local
+
+Para probar los datos por dueño con cuentas falsas, sin tocar producción:
+
+1. En una terminal: `pnpm emuladores`.
+2. En otra: `EXPO_PUBLIC_USAR_EMULADORES=1 pnpm start` y abre la web que imprime.
+
+Con la variable encendida la app usa el proyecto `demo-cuentame` y va a los emuladores de Auth (`127.0.0.1:9099`) y Firestore (`127.0.0.1:8080`); el popup de Google deja crear cuentas falsas. Sin la variable, nada cambia: la app apunta al proyecto real. Pages y el CI nunca la definen.
+
 ## Estructura
 
 ```

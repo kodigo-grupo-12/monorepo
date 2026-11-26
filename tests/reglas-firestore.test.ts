@@ -20,6 +20,16 @@ import {
 } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import {
+  consultaCarterasPorDuenio,
+  consultaCategoriasGlobales,
+  consultaCategoriasPropias,
+  consultaTransaccionesPorDuenio,
+  documentoNuevaCartera,
+  documentoNuevaCategoria,
+  documentoNuevaTransaccion,
+} from '../apps/cuentame/src/datos/consultas';
+
 // Las pruebas hablan solo con el emulador. Si esa variable no está, el SDK
 // podría apuntar al proyecto real: abortamos antes de tocar nada.
 if (!process.env.FIRESTORE_EMULATOR_HOST) {
@@ -245,6 +255,161 @@ describe('reglas de Firestore', () => {
       await assertFails(setDoc(doc(db, 'transacciones', 'tipo'), transaccionDe(UID_A, { tipo: 'transferencia' })));
       await assertFails(setDoc(doc(db, 'transacciones', 'fecha'), transaccionDe(UID_A, { fecha: '26/11/2026' })));
       await assertSucceeds(setDoc(doc(db, 'transacciones', 'ok'), transaccionDe(UID_A)));
+    });
+  });
+
+  describe('capa de datos: uid de sesión', () => {
+    it('crea transacción, categoría y cartera con uid, sin cuenta demo y sin global', async () => {
+      const altaTransaccion = documentoNuevaTransaccion(
+        {
+          tipo: 'gasto',
+          monto: 4.5,
+          fecha: '2026-11-26',
+          nota: 'Café',
+          categoria_id: 'cat-1',
+          cartera_id: 'w-1',
+        },
+        UID_A,
+      );
+      const altaCategoria = documentoNuevaCategoria('Café de la esquina', 'gasto', UID_A);
+      const altaCartera = documentoNuevaCartera('Banco', UID_A);
+
+      expect(altaTransaccion).toMatchObject({ uid: UID_A, tipo: 'gasto', monto: 4.5 });
+      expect(altaTransaccion).not.toHaveProperty('cuenta');
+      expect(altaTransaccion).not.toHaveProperty('global');
+      expect(altaCategoria).toEqual({ uid: UID_A, nombre: 'Café de la esquina', tipo: 'gasto' });
+      expect(altaCategoria).not.toHaveProperty('global');
+      expect(altaCartera).toEqual({ uid: UID_A, nombre: 'Banco' });
+      expect(altaCartera).not.toHaveProperty('global');
+
+      const db = sesion(UID_A);
+      await assertSucceeds(setDoc(doc(db, 'transacciones', 'alta-t'), altaTransaccion));
+      await assertSucceeds(setDoc(doc(db, 'categorias', 'alta-k'), altaCategoria));
+      await assertSucceeds(setDoc(doc(db, 'carteras', 'alta-w'), altaCartera));
+
+      const transaccion = await getDoc(doc(db, 'transacciones', 'alta-t'));
+      const categoria = await getDoc(doc(db, 'categorias', 'alta-k'));
+      const cartera = await getDoc(doc(db, 'carteras', 'alta-w'));
+      expect(transaccion.data()).toMatchObject({ uid: UID_A, monto: 4.5 });
+      expect(transaccion.data()).not.toHaveProperty('cuenta');
+      expect(transaccion.data()).not.toHaveProperty('global');
+      expect(categoria.data()).toEqual({ uid: UID_A, nombre: 'Café de la esquina', tipo: 'gasto' });
+      expect(cartera.data()).toEqual({ uid: UID_A, nombre: 'Banco' });
+    });
+
+    it('rechaza crear sin uid válido o con uid y global juntos', async () => {
+      const db = sesion(UID_A);
+      await assertFails(
+        setDoc(doc(db, 'transacciones', 'sin-uid'), {
+          tipo: 'gasto',
+          monto: 10,
+          fecha: '2026-11-26',
+        }),
+      );
+      await assertFails(
+        setDoc(doc(db, 'carteras', 'sin-uid'), { nombre: 'Efectivo' }),
+      );
+      await assertFails(
+        setDoc(doc(db, 'categorias', 'sin-uid'), { nombre: 'Gym', tipo: 'gasto' }),
+      );
+      await assertFails(
+        setDoc(doc(db, 'transacciones', 'uid-ajeno'), documentoNuevaTransaccion(
+          { tipo: 'ingreso', monto: 20, fecha: '2026-11-26' },
+          UID_B,
+        )),
+      );
+      await assertFails(
+        setDoc(doc(db, 'categorias', 'con-global'), {
+          ...documentoNuevaCategoria('Falsa', 'gasto', UID_A),
+          global: true,
+        }),
+      );
+    });
+  });
+
+  describe('consultas de los listeners', () => {
+    const TOTAL_A = 110;
+
+    function fechaDe(indice: number): string {
+      const fecha = new Date(Date.UTC(2024, 0, 1 + indice));
+      return fecha.toISOString().slice(0, 10);
+    }
+
+    beforeEach(async () => {
+      await entorno.withSecurityRulesDisabled(async (contexto) => {
+        const db = contexto.firestore();
+        await setDoc(doc(db, 'categorias', 'prod-comida'), {
+          nombre: 'Comida y bebida',
+          tipo: 'gasto',
+          global: true,
+        });
+        await setDoc(doc(db, 'categorias', 'prod-salario'), {
+          nombre: 'Salario',
+          tipo: 'ingreso',
+          global: true,
+        });
+        await setDoc(doc(db, 'categorias', 'de-a'), { uid: UID_A, nombre: 'Café', tipo: 'gasto' });
+        await setDoc(doc(db, 'categorias', 'de-b'), { uid: UID_B, nombre: 'Gym', tipo: 'gasto' });
+        await setDoc(doc(db, 'carteras', 'w-a-1'), { uid: UID_A, nombre: 'Efectivo' });
+        await setDoc(doc(db, 'carteras', 'w-a-2'), { uid: UID_A, nombre: 'Banco' });
+        await setDoc(doc(db, 'carteras', 'w-b'), { uid: UID_B, nombre: 'Ajena' });
+
+        await Promise.all(
+          Array.from({ length: TOTAL_A }, (_, indice) =>
+            setDoc(
+              doc(db, 'transacciones', `t-a-${indice}`),
+              transaccionDe(UID_A, { fecha: fechaDe(indice), monto: indice + 1 }),
+            ),
+          ),
+        );
+        await setDoc(doc(db, 'transacciones', 't-b-1'), transaccionDe(UID_B, { fecha: '2026-01-01' }));
+        await setDoc(doc(db, 'transacciones', 't-b-2'), transaccionDe(UID_B, { fecha: '2026-12-31' }));
+      });
+    });
+
+    it('con sesión A solo ve lo de A, más las categorías de producción', async () => {
+      const a = sesion(UID_A);
+      const b = sesion(UID_B);
+
+      const transaccionesA = await assertSucceeds(getDocs(consultaTransaccionesPorDuenio(a, UID_A)));
+      const carterasA = await assertSucceeds(getDocs(consultaCarterasPorDuenio(a, UID_A)));
+      const propiasA = await assertSucceeds(getDocs(consultaCategoriasPropias(a, UID_A)));
+      const globalesA = await assertSucceeds(getDocs(consultaCategoriasGlobales(a)));
+
+      const idsTransaccionesA = transaccionesA.docs.map((documento) => documento.id);
+      expect(idsTransaccionesA).toHaveLength(TOTAL_A);
+      expect(idsTransaccionesA).not.toContain('t-b-1');
+      expect(idsTransaccionesA).not.toContain('t-b-2');
+      expect(carterasA.docs.map((documento) => documento.id).sort()).toEqual(['w-a-1', 'w-a-2']);
+      expect(propiasA.docs.map((documento) => documento.id)).toEqual(['de-a']);
+      expect(globalesA.docs.map((documento) => documento.id).sort()).toEqual([
+        'prod-comida',
+        'prod-salario',
+      ]);
+
+      const categoriasA = [...globalesA.docs, ...propiasA.docs].map((documento) => documento.id).sort();
+      expect(categoriasA).toEqual(['de-a', 'prod-comida', 'prod-salario']);
+      expect(categoriasA).not.toContain('de-b');
+
+      const transaccionesB = await assertSucceeds(getDocs(consultaTransaccionesPorDuenio(b, UID_B)));
+      expect(transaccionesB.docs.map((documento) => documento.id).sort()).toEqual(['t-b-1', 't-b-2']);
+      await assertFails(getDocs(consultaTransaccionesPorDuenio(a, UID_B)));
+      await assertFails(getDocs(consultaCarterasPorDuenio(a, UID_B)));
+      await assertFails(getDocs(consultaCategoriasPropias(a, UID_B)));
+    });
+
+    it('el listener de transacciones no recorta y viene ordenado por fecha', async () => {
+      const db = sesion(UID_A);
+      const instantanea = await assertSucceeds(getDocs(consultaTransaccionesPorDuenio(db, UID_A)));
+      expect(instantanea.size).toBe(TOTAL_A);
+      expect(instantanea.size).toBeGreaterThan(100);
+
+      const fechas = instantanea.docs.map((documento) => documento.data().fecha as string);
+      const ids = instantanea.docs.map((documento) => documento.id);
+      expect(fechas).toEqual([...fechas].sort().reverse());
+      expect(ids[0]).toBe(`t-a-${TOTAL_A - 1}`);
+      expect(ids[ids.length - 1]).toBe('t-a-0');
+      expect(consultaTransaccionesPorDuenio.toString()).not.toMatch(/\blimit\s*\(/);
     });
   });
 });

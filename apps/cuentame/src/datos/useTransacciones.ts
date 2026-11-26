@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, orderBy, query } from 'firebase/firestore';
-import { coleccionTransacciones } from './transacciones';
+import { onSnapshot } from 'firebase/firestore';
+
+import { useSesion } from '../sesion/ProveedorSesion';
+import { consultaTransaccionesPorDuenio } from './consultas';
+import { db } from './firebase';
 import type { Transaccion } from './transacciones';
 
 export interface TransaccionesEstado {
@@ -11,15 +14,28 @@ export interface TransaccionesEstado {
   error: boolean;
 }
 
-// Escucha en tiempo real: lo guardado aparece en todos lados sin recargar.
+function vaciar(): Transaccion[] {
+  return [];
+}
+
+// Escucha en tiempo real el historial completo de la persona, ordenado por
+// fecha y sin límite. Se cancela al cerrar sesión y no deja datos ajenos.
 export function useTransacciones(): TransaccionesEstado {
+  const { usuario } = useSesion();
+  const uid = usuario?.uid;
   const [transacciones, setTransacciones] = useState<Transaccion[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (!uid) {
+      setTransacciones(vaciar());
+      setCargando(false);
+      return;
+    }
+    setCargando(true);
     const escucha = onSnapshot(
-      query(coleccionTransacciones, orderBy('fecha', 'desc')),
+      consultaTransaccionesPorDuenio(db, uid),
       (instantanea) => {
         setTransacciones(
           instantanea.docs.map((documento) => ({
@@ -32,12 +48,16 @@ export function useTransacciones(): TransaccionesEstado {
       },
       (error) => {
         console.error('No se pudieron escuchar las transacciones:', error);
+        setTransacciones(vaciar());
         setError(true);
         setCargando(false);
       },
     );
-    return escucha;
-  }, []);
+    return () => {
+      escucha();
+      setTransacciones(vaciar());
+    };
+  }, [uid]);
 
   return { transacciones, cargando, error };
 }

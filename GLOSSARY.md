@@ -32,6 +32,14 @@ _Avoid_: cuenta temporal, usuario de prueba
 La sesión persistente de Firebase Auth. Si existe, el splash deja ver el inicio. Sigue ahí al recargar. El proveedor expone `cargando`, `activa`, `entrar`, `salir` y el usuario actual (`uid`, `nombre`, `correo`, `foto`).
 _Avoid_: marca local, token propio
 
+**Dueño (uid)**:
+El identificador de Firebase Auth de la persona. La capa de datos lo pone al crear una transacción, una categoría o una cartera; las pantallas no lo escriben. Los listeners filtran por este campo. Nunca va junto con `global` en el mismo documento.
+_Avoid_: userId, owner, cuenta
+
+**Reglas de Firestore**:
+Las reglas versionadas en el repo que niegan todo por defecto. Con sesión, cada persona lee y escribe solo documentos cuyo `uid` es el suyo. Las categorías de producción (`global: true`, sin `uid`) se leen con cualquier sesión y nadie las escribe desde la app. Una consulta sin el filtro que toca no pasa.
+_Avoid_: permisos abiertos, modo prueba
+
 **Inicio**:
 La pantalla de después de entrar. También es la que sigue al splash cuando ya hay sesión. Hoy muestra el texto «Cuéntame».
 _Avoid_: home, pantalla principal
@@ -149,7 +157,7 @@ _Avoid_: estado inicial, valores por defecto
 ### Las categorías y las carteras
 
 **Categoría**:
-Etiqueta plana de una transacción: tiene nombre y tipo (gasto o ingreso). Es global, no pertenece a carteras, y no tiene jerarquía ni sub-niveles.
+Etiqueta plana de una transacción: tiene nombre y tipo (gasto o ingreso). No pertenece a carteras y no tiene jerarquía ni sub-niveles. Las 14 de producción son globales (`global: true`, sin `uid`); las que crea la persona llevan su `uid` y no llevan `global`.
 _Avoid_: tag, clasificación
 
 **Cartera**:

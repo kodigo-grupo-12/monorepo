@@ -1,4 +1,5 @@
 import {
+  connectAuthEmulator,
   GoogleAuthProvider,
   browserPopupRedirectResolver,
   getAuth,
@@ -11,7 +12,17 @@ import {
 import { firebase } from '../datos/firebase';
 import type { UsuarioSesion } from './usuario';
 
+// Solo la web local contra los emuladores (pnpm emuladores). Acceso estático
+// porque Metro solo inlina process.env.EXPO_PUBLIC_* literales.
+const USAR_EMULADORES = process.env.EXPO_PUBLIC_USAR_EMULADORES === '1';
+
 const autenticacion = getAuth(firebase);
+
+// Igual que en firebase.ts: solo con la variable encendida, y nunca desde
+// Pages ni el CI (que no definen la variable).
+if (USAR_EMULADORES) {
+  connectAuthEmulator(autenticacion, 'http://127.0.0.1:9099', { disableWarnings: true });
+}
 const proveedorGoogle = new GoogleAuthProvider();
 proveedorGoogle.setCustomParameters({ prompt: 'select_account' });
 
@@ -49,6 +60,14 @@ export function observarAuth(escucha: (usuario: UsuarioSesion | null) => void): 
 
 function usuarioActual(): UsuarioSesion | null {
   return autenticacion.currentUser ? deUsuarioFirebase(autenticacion.currentUser) : null;
+}
+
+export function uidDeSesion(): string {
+  const usuario = autenticacion.currentUser;
+  if (!usuario) {
+    throw new Error('No hay sesión activa');
+  }
+  return usuario.uid;
 }
 
 // Chrome con COOP a veces no deja a Firebase leer window.closed. El foco en
