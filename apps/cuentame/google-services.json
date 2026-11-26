@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "406554426954",
+    "project_id": "kodigo-grupo12",
+    "storage_bucket": "kodigo-grupo12.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:406554426954:android:0d112b277e2493b2bc30b3",
+        "android_client_info": {
+          "package_name": "com.kodigogrupo12.cuentame"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAG1y0sVza5wMwxMRVAvE5caGlJdjXJLWQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
