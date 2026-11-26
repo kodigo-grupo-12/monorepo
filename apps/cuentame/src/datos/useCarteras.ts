@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 
-import { coleccionCarteras } from './carteras';
+import { useSesion } from '../sesion/ProveedorSesion';
+import { consultaCarterasPorDuenio } from './consultas';
+import { db } from './firebase';
 import type { Cartera } from './carteras';
 
 export interface CarterasEstado {
@@ -9,14 +11,27 @@ export interface CarterasEstado {
   cargando: boolean;
 }
 
-// Escucha en tiempo real, al patrón de useTransacciones.
+function vaciar(): Cartera[] {
+  return [];
+}
+
+// Escucha en tiempo real las carteras de la persona. Se cancela al cerrar
+// sesión y no deja datos de la cuenta anterior.
 export function useCarteras(): CarterasEstado {
+  const { usuario } = useSesion();
+  const uid = usuario?.uid;
   const [carteras, setCarteras] = useState<Cartera[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
+    if (!uid) {
+      setCarteras(vaciar());
+      setCargando(false);
+      return;
+    }
+    setCargando(true);
     const escucha = onSnapshot(
-      coleccionCarteras,
+      consultaCarterasPorDuenio(db, uid),
       (instantanea) => {
         setCarteras(
           instantanea.docs
@@ -30,11 +45,15 @@ export function useCarteras(): CarterasEstado {
       },
       (error) => {
         console.error('No se pudieron escuchar las carteras:', error);
+        setCarteras(vaciar());
         setCargando(false);
       },
     );
-    return escucha;
-  }, []);
+    return () => {
+      escucha();
+      setCarteras(vaciar());
+    };
+  }, [uid]);
 
   return { carteras, cargando };
 }

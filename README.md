@@ -91,6 +91,29 @@ Envuelve `firebase deploy --only firestore:rules,firestore:indexes --project kod
 
 `.firebaserc` deja `kodigo-grupo12` como proyecto por defecto. Cualquier comando `firebase` sin `--project` apunta a producción.
 
+### Emuladores para la web local
+
+Para probar los datos por dueño con cuentas falsas, sin tocar producción:
+
+1. En una terminal: `pnpm emuladores`.
+2. En otra: `EXPO_PUBLIC_USAR_EMULADORES=1 pnpm start` y abre la web que imprime.
+
+Con la variable encendida la app usa el proyecto `demo-cuentame` y va a los emuladores de Auth (`127.0.0.1:9099`) y Firestore (`127.0.0.1:8080`); el popup de Google deja crear cuentas falsas. Sin la variable, nada cambia: la app apunta al proyecto real. Pages y el CI nunca la definen.
+
+### Scripts de Firestore
+
+Scripts de administración con `firebase-admin` en `scripts/firestore/`. Contra el emulador:
+
+1. `pnpm emuladores` en una terminal.
+2. En otra: `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/firestore/<script>.mjs`.
+
+- `marcar-categorias-produccion.mjs`: pone `global: true` en las 14 categorías de producción; si falta alguna, la crea con id `produccion-<slug>`. Idempotente.
+- `borrar-demo-legado.mjs`: lista los datos sin `uid` de la demo compartida anterior y borra solo con `--confirmar`, en lotes de 500.
+- `sembrar-historial.mjs --uid <uid>`: siembra el historial determinista de un uid (98 transacciones y 3 carteras, con la semilla 12 y el día pico del 15 de hace dos meses). Idempotente; `--semilla <n>` y `--hoy AAAA-MM-DD` cambian la generación.
+
+Todos se niegan a correr fuera del emulador sin `--produccion`, y `--produccion` solo se usa con la orden explícita de Roberto, desde su máquina y con credenciales de administración (`gcloud auth application-default login`). Para `sembrar-historial` en producción, Roberto ya dio permiso para sembrar hasta 100 ejemplos en su cuenta de prueba, pero se corre solo cuando él lo diga.
+
+
 ## Estructura
 
 ```

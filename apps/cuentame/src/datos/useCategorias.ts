@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 
-import { coleccionCategorias } from './categorias';
+import { useSesion } from '../sesion/ProveedorSesion';
+import { consultaCategoriasGlobales, consultaCategoriasPropias } from './consultas';
+import { db } from './firebase';
 import type { Categoria } from './categorias';
 
 export interface CategoriasEstado {
   categorias: Categoria[];
   cargando: boolean;
+}
+
+function vaciar(): Categoria[] {
+  return [];
 }
 
 // Orden del modelo de Categorías: la lista de producción en su orden fijo y
@@ -31,33 +37,86 @@ function claveOrden(categoria: Categoria): number {
   return indice === -1 ? lista.length : indice;
 }
 
-// Escucha en tiempo real, al patrón de useTransacciones. El orden del
-// modelo se compone aquí para que pantalla y picker muestren lo mismo.
+export function ordenarCategorias(categorias: Categoria[]): Categoria[] {
+  return [...categorias].sort(
+    (a, b) => claveOrden(a) - claveOrden(b) || a.nombre.localeCompare(b.nombre),
+  );
+}
+
+// Une las categorías de producción (global: true) con las de la persona.
+// Las dos consultas son las que permiten las reglas; se cancelan al salir.
 export function useCategorias(): CategoriasEstado {
+  const { usuario } = useSesion();
+  const uid = usuario?.uid;
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    const escucha = onSnapshot(
-      coleccionCategorias,
+    if (!uid) {
+      setCategorias(vaciar());
+      setCargando(false);
+      return;
+    }
+
+    setCargando(true);
+    let propias: Categoria[] = [];
+    let globales: Categoria[] = [];
+    let propiasListas = false;
+    let globalesListas = false;
+
+    const publicar = () => {
+      if (!propiasListas || !globalesListas) {
+        return;
+      }
+      setCategorias(ordenarCategorias([...globales, ...propias]));
+      setCargando(false);
+    };
+
+    const deDocumento = (id: string, datos: Omit<Categoria, 'id'>): Categoria => ({
+      id,
+      ...datos,
+    });
+
+    const dejarPropias = onSnapshot(
+      consultaCategoriasPropias(db, uid),
       (instantanea) => {
-        setCategorias(
-          instantanea.docs
-            .map((documento) => ({
-              id: documento.id,
-              ...(documento.data() as Omit<Categoria, 'id'>),
-            }))
-            .sort((a, b) => claveOrden(a) - claveOrden(b) || a.nombre.localeCompare(b.nombre)),
+        propias = instantanea.docs.map((documento) =>
+          deDocumento(documento.id, documento.data() as Omit<Categoria, 'id'>),
         );
-        setCargando(false);
+        propiasListas = true;
+        publicar();
       },
       (error) => {
-        console.error('No se pudieron escuchar las categorías:', error);
-        setCargando(false);
+        console.error('No se pudieron escuchar las categorías propias:', error);
+        propias = [];
+        propiasListas = true;
+        publicar();
       },
     );
-    return escucha;
-  }, []);
+
+    const dejarGlobales = onSnapshot(
+      consultaCategoriasGlobales(db),
+      (instantanea) => {
+        globales = instantanea.docs.map((documento) =>
+          deDocumento(documento.id, documento.data() as Omit<Categoria, 'id'>),
+        );
+        globalesListas = true;
+        publicar();
+      },
+      (error) => {
+        console.error('No se pudieron escuchar las categorías de producción:', error);
+        globales = [];
+        globalesListas = true;
+        publicar();
+      },
+    );
+
+    return () => {
+      dejarPropias();
+      dejarGlobales();
+      setCategorias(vaciar());
+    };
+  }, [uid]);
 
   return { categorias, cargando };
 }

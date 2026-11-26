@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 
 // La config web del proyecto vive en el .env de apps/cuentame (ver .env.example).
 // Metro solo inlina accesos estáticos process.env.EXPO_PUBLIC_*: el bundle web
@@ -13,6 +13,10 @@ const ENV = {
   EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Solo la web local contra los emuladores (pnpm emuladores). Acceso estático
+// porque Metro solo inlina process.env.EXPO_PUBLIC_* literales.
+const USAR_EMULADORES = process.env.EXPO_PUBLIC_USAR_EMULADORES === '1';
+
 const NOMBRES = Object.keys(ENV) as (keyof typeof ENV)[];
 const faltantes = NOMBRES.filter((nombre) => !ENV[nombre]);
 if (faltantes.length > 0) {
@@ -24,7 +28,7 @@ if (faltantes.length > 0) {
 const config = {
   apiKey: ENV.EXPO_PUBLIC_FIREBASE_API_KEY as string,
   authDomain: ENV.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN as string,
-  projectId: ENV.EXPO_PUBLIC_FIREBASE_PROJECT_ID as string,
+  projectId: USAR_EMULADORES ? 'demo-cuentame' : (ENV.EXPO_PUBLIC_FIREBASE_PROJECT_ID as string),
   messagingSenderId: ENV.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID as string,
   appId: ENV.EXPO_PUBLIC_FIREBASE_APP_ID as string,
 };
@@ -32,3 +36,9 @@ const config = {
 // Una sola instancia aunque el módulo se importe desde varios lugares.
 export const firebase = getApps().length > 0 ? getApp() : initializeApp(config);
 export const db = getFirestore(firebase);
+
+// Solo con la variable encendida: apunta al emulador de Firestore, nunca al
+// proyecto real. Pages y el CI no definen la variable, así que no llegan aquí.
+if (USAR_EMULADORES) {
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+}

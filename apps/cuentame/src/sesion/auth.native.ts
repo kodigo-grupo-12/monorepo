@@ -14,3 +14,7 @@ export async function entrarConGoogle(): Promise<UsuarioSesion> {
 }
 
 export async function salirDeAuth(): Promise<void> {}
+
+export function uidDeSesion(): string {
+  throw new Error('No hay sesión activa');
+}
