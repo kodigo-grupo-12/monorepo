@@ -24,6 +24,8 @@ import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccio
 import { IconoCartera } from '../carteras/IconoCartera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { MESES, aISO, deISO } from '../transacciones/fechas';
+import { mostrarAviso } from '../avisos/avisos';
+import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 
 type Periodo = 'semana' | 'mes';
 
@@ -35,7 +37,7 @@ const controladorNativo = Platform.OS !== 'web';
 export function PantallaInicio() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
-  const { transacciones, cargando } = useTransacciones();
+  const { transacciones, cargando, error } = useTransacciones();
   const { categorias } = useCategorias();
   const { carteras } = useCarteras();
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
@@ -86,6 +88,13 @@ export function PantallaInicio() {
     try {
       await eliminarTransaccion(pendiente.id);
       setPendiente(undefined);
+    } catch (error) {
+      console.error('No se pudo eliminar la transacción:', error);
+      mostrarAviso({
+        mensaje: 'No se pudo eliminar',
+        tipo: 'error',
+        accion: { etiqueta: 'Reintentar', alTocar: () => void confirmarEliminacion() },
+      });
     } finally {
       setEliminando(false);
     }
@@ -205,6 +214,10 @@ export function PantallaInicio() {
   return (
     <View style={[estilos.contenedor, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
       <ScrollView contentContainerStyle={estilos.lista}>
+        {/* Estado de sincronización (T013): una línea discreta encima del
+            saldo que dice si los datos están al día o se reintentan. */}
+        <BannerSincronizacion visible={!cargando} sincronizado={!error} />
+
         {/* Header: saldo real de hoy con el ojito a la derecha y Balance
             total debajo. SIN lupa y SIN campana (fuera por tiempo). */}
         <View style={estilos.encabezado}>

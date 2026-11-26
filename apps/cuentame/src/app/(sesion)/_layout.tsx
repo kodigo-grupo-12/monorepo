@@ -5,6 +5,7 @@ import { Redirect, Stack } from 'expo-router';
 import { Navbar } from '../../nav/Navbar';
 import { ModalAgregarTransaccion } from '../../transacciones/ModalAgregarTransaccion';
 import { useSesion } from '../../sesion/ProveedorSesion';
+import { AvisosGlobal } from '../../avisos/AvisosGlobal';
 import { paleta } from '../../tema/colores';
 
 // Layout del grupo con sesión: el navbar se monta una sola vez aquí y
@@ -38,6 +39,9 @@ export default function DisposicionSesion() {
         visible={modalAbierto}
         alCerrar={() => setModalAbierto(false)}
       />
+      {/* Los avisos in-app (T013) viven aquí una sola vez: toast sobre el
+          navbar, apagable desde Configuraciones. */}
+      <AvisosGlobal />
     </View>
   );
 }
