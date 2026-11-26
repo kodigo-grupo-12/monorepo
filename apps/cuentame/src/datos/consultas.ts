@@ -1,16 +1,23 @@
+import type { Compromiso } from './compromisos';
+import { notaDeOrigen } from '../compromisos/calculos';
 import {
   collection,
+  deleteField,
+  doc,
   orderBy,
   query,
   where,
+  writeBatch,
   type DocumentData,
   type Firestore,
   type Query,
+  type WriteBatch,
 } from 'firebase/firestore';
 
 export const COLECCION_TRANSACCIONES = 'transacciones';
 export const COLECCION_CATEGORIAS = 'categorias';
 export const COLECCION_CARTERAS = 'carteras';
+export const COLECCION_COMPROMISOS = 'compromisos';
 
 export type DatosNuevaTransaccion = {
   tipo: 'gasto' | 'ingreso';
@@ -21,6 +28,11 @@ export type DatosNuevaTransaccion = {
   categoria_id?: string;
   cartera_id?: string;
   imagen?: string;
+  // Amarre a un compromiso (ADR-0019). Los escribe la capa de datos solo
+  // al crear; cambiosTransaccion nunca los lleva.
+  compromiso_id?: string;
+  rol?: 'origen' | 'abono';
+  neutral?: boolean;
 };
 
 function sinIndefinidos(valores: Record<string, unknown>): Record<string, unknown> {
@@ -42,6 +54,9 @@ export function documentoNuevaTransaccion(
     categoria_id: datos.categoria_id,
     cartera_id: datos.cartera_id,
     imagen: datos.imagen,
+    compromiso_id: datos.compromiso_id,
+    rol: datos.rol,
+    neutral: datos.neutral,
   });
 }
 
@@ -57,6 +72,34 @@ export function documentoNuevaCartera(nombre: string, uid: string): { uid: strin
   return { uid, nombre };
 }
 
+export type DatosNuevoCompromiso = Omit<Compromiso, 'id' | 'uid' | 'cierre'>;
+
+// El uid lo pone la capa de datos. Nunca escribe cierre ni global: un
+// compromiso nace abierto. La contraparte va recortada.
+export function documentoNuevoCompromiso(
+  datos: DatosNuevoCompromiso,
+  uid: string,
+): DocumentData {
+  return sinIndefinidos({
+    uid,
+    direccion: datos.direccion,
+    naturaleza: datos.naturaleza,
+    contraparte: datos.contraparte.trim(),
+    telefono: datos.telefono,
+    monto: datos.monto,
+    fecha: datos.fecha,
+    vence: datos.vence,
+    plan: datos.plan,
+    precio_contado: datos.precio_contado,
+    categoria_id: datos.categoria_id,
+    cartera_id: datos.cartera_id,
+    nota: datos.nota,
+  });
+}
+
+// NO llevar compromiso_id, rol ni neutral aquí: actualizarTransaccion borra
+// lo indefinido con deleteField y editar desde Inicio rompería el amarre
+// (ADR-0019). El amarre se escribe una sola vez, al crear.
 export function cambiosTransaccion(
   cambios: DatosNuevaTransaccion,
 ): Record<string, unknown> {
@@ -79,6 +122,85 @@ export function consultaTransaccionesPorDuenio(db: Firestore, uid: string): Quer
     where('uid', '==', uid),
     orderBy('fecha', 'desc'),
   );
+}
+
+// Arma el batch del compromiso nuevo y, si la plata salió o entró de una
+// cartera (solo naturaleza 'dinero'), la transacción de origen amarrada en
+// el mismo batch. No hace commit: quien llama decide cuándo (#132).
+export function armarBatchCompromiso(
+  db: Firestore,
+  datos: DatosNuevoCompromiso,
+  uid: string,
+  origen?: { cartera_id: string },
+): { batch: WriteBatch; id: string } {
+  const batch = writeBatch(db);
+  const referencia = doc(collection(db, COLECCION_COMPROMISOS));
+  batch.set(referencia, documentoNuevoCompromiso(datos, uid));
+  if (origen && datos.naturaleza === 'dinero') {
+    batch.set(
+      doc(collection(db, COLECCION_TRANSACCIONES)),
+      documentoNuevaTransaccion(
+        {
+          tipo: datos.direccion === 'me_deben' ? 'gasto' : 'ingreso',
+          monto: datos.monto,
+          fecha: datos.fecha,
+          cartera_id: origen.cartera_id,
+          compromiso_id: referencia.id,
+          rol: 'origen',
+          neutral: true,
+          nota: notaDeOrigen({ direccion: datos.direccion, contraparte: datos.contraparte.trim() }),
+        },
+        uid,
+      ),
+    );
+  }
+  return { batch, id: referencia.id };
+}
+
+// Borra un compromiso y decide qué pasa con sus transacciones amarradas
+// (#135): con 'todo' se borran, con 'soltar' pierden el amarre (compromiso_id,
+// rol y neutral con deleteField) y quedan como gasto o ingreso normales. Con
+// más de 450 escrituras se parte en varios batches.
+const TOPE_BORRADO = 450;
+
+export function armarBatchBorrado(
+  db: Firestore,
+  compromisoId: string,
+  amarradasIds: string[],
+  modo: 'todo' | 'soltar',
+): { batches: WriteBatch[] } {
+  const batches: WriteBatch[] = [];
+  let batch = writeBatch(db);
+  batch.delete(doc(db, COLECCION_COMPROMISOS, compromisoId));
+  let escrituras = 1;
+  for (const idAmarrada of amarradasIds) {
+    if (escrituras >= TOPE_BORRADO) {
+      batches.push(batch);
+      batch = writeBatch(db);
+      escrituras = 0;
+    }
+    const referencia = doc(db, COLECCION_TRANSACCIONES, idAmarrada);
+    if (modo === 'todo') {
+      batch.delete(referencia);
+    } else {
+      batch.update(referencia, {
+        compromiso_id: deleteField(),
+        rol: deleteField(),
+        neutral: deleteField(),
+      });
+    }
+    escrituras += 1;
+  }
+  if (escrituras > 0) {
+    batches.push(batch);
+  }
+  return { batches };
+}
+
+// Sin orderBy a propósito: el orden se hace en el aparato y así no hace
+// falta ningún índice compuesto (spec #130).
+export function consultaCompromisosPorDuenio(db: Firestore, uid: string): Query {
+  return query(collection(db, COLECCION_COMPROMISOS), where('uid', '==', uid));
 }
 
 export function consultaCarterasPorDuenio(db: Firestore, uid: string): Query {

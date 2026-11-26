@@ -123,8 +123,8 @@ Transacción que sale de la cartera.
 _Avoid_: egreso
 
 **Ingreso**:
-Transacción que entra a la cartera.
-_Avoid_: entrada, abono
+Transacción que entra a la cartera. (No confundir con Abono.)
+_Avoid_: entrada
 
 **Monto**:
 Cifra de la transacción, mayor a 0 y con máximo 2 decimales, en USD.
@@ -207,3 +207,45 @@ _Avoid_: build web, compilado
 **Export**:
 El comando que convierte la app en el bundle web (expo export --platform web). El de Pages corre con PAGES_DEPLOY=1 para ajustar el modo single y el baseUrl.
 _Avoid_: build de producción, deploy
+
+## Deudas y préstamos
+
+**Compromiso**:
+El registro de una deuda o un préstamo entre la persona y su contraparte, con dirección, naturaleza, monto y fecha. Nada de lo que es suma se guarda: lo pendiente y el estado se calculan.
+_Avoid_: deuda como nombre genérico, préstamo como nombre genérico
+
+**Deudas y préstamos**:
+La sección de Inicio donde la persona ve lo que le deben y lo que debe, y anota cobros y pagos. Su spec es la #130 y su ADR el 0019.
+_Avoid_: pestaña de deudas, módulo de préstamos
+
+**Contraparte**:
+La otra persona del compromiso: quien me debe o a quien debo. Se guarda con nombre y, opcionalmente, teléfono con el código del país para recordarle por WhatsApp.
+_Avoid_: persona, deudor, acreedor
+
+**Abono**:
+Transacción amarrada al compromiso que baja lo pendiente. Un cobro (me deben) o un pago (debo) que entra al historial como cualquier movimiento.
+_Avoid_: pago suelto, parcialidad
+
+**Pendiente**:
+Lo que falta por cobrar o pagar de un compromiso: el monto menos lo abonado, calculado en el momento.
+_Avoid_: saldo de la deuda
+
+**Vencimiento**:
+La fecha opcional en la que el compromiso debía estar saldado. Pasada la fecha con pendiente, el compromiso queda vencido.
+_Avoid_: fecha límite, deadline
+
+**Movimiento neutral**:
+Transacción que mueve plata sin ser gasto ni ingreso: prestar, pagar una deuda, recibir un préstamo o cobrar. Sale del análisis de Inicio (gráfico, delta y desglose) y entra al saldo.
+_Avoid_: transacción especial, ajuste
+
+**Cierre**:
+El final de un compromiso que no fue por pagarlo completo: perdonado o cancelado. Un compromiso con cierre ya no cambia de estado.
+_Avoid_: borrado, eliminado
+
+**Plan de cuotas**:
+El acuerdo opcional de pagar en partes: modo fijo o variable, número de cuotas, día del mes y primer mes. Se guarda en el compromiso y las cuotas se calculan, no se graban.
+_Avoid_: calendario de pagos, financiación
+
+**Cuota**:
+Cada parte del plan de cuotas: una cantidad fija o variable con su fecha esperada. Se calcula del plan; hasta que se paga no es una transacción.
+_Avoid_: mensualidad

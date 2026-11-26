@@ -11,6 +11,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  deleteField,
   getDoc,
   getDocs,
   query,
@@ -21,6 +22,7 @@ import {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  consultaCompromisosPorDuenio,
   consultaCarterasPorDuenio,
   consultaCategoriasGlobales,
   consultaCategoriasPropias,
@@ -411,5 +413,117 @@ describe('reglas de Firestore', () => {
       expect(ids[ids.length - 1]).toBe('t-a-0');
       expect(consultaTransaccionesPorDuenio.toString()).not.toMatch(/\blimit\s*\(/);
     });
+  });
+});
+
+function compromisoDe(uid: string, extra: Record<string, unknown> = {}) {
+  return {
+    uid,
+    direccion: 'me_deben',
+    naturaleza: 'dinero',
+    contraparte: 'Juan',
+    monto: 50,
+    fecha: '2026-11-26',
+    ...extra,
+  };
+}
+
+describe('reglas de compromisos', () => {
+  it('el dueño crea, lee, actualiza y borra; el ajeno no puede nada', async () => {
+    const a = sesion(UID_A);
+    const b = sesion(UID_B);
+    await assertSucceeds(setDoc(doc(a, 'compromisos', 'c-a'), compromisoDe(UID_A)));
+    await assertSucceeds(getDoc(doc(a, 'compromisos', 'c-a')));
+    await assertSucceeds(updateDoc(doc(a, 'compromisos', 'c-a'), { monto: 60 }));
+    await assertSucceeds(deleteDoc(doc(a, 'compromisos', 'c-a')));
+
+    await assertSucceeds(setDoc(doc(a, 'compromisos', 'c-2'), compromisoDe(UID_A)));
+    await assertFails(getDoc(doc(b, 'compromisos', 'c-2')));
+    await assertFails(updateDoc(doc(b, 'compromisos', 'c-2'), { monto: 70 }));
+    await assertFails(deleteDoc(doc(b, 'compromisos', 'c-2')));
+    await assertFails(setDoc(doc(b, 'compromisos', 'c-b'), compromisoDe(UID_A)));
+  });
+
+  it('rechaza un compromiso inválido, un caso por dato', async () => {
+    const db = sesion(UID_A);
+    const casos = [
+      { direccion: 'presto' },
+      { monto: 0 },
+      { contraparte: '' },
+      { contraparte: 'a'.repeat(61) },
+      { fecha: '26/11/2026' },
+      { telefono: '12ab' },
+      { cierre: 'pagado' },
+      { plan: { modo: 'mensual', numero_cuotas: 12, dia: 5, primera: '2026-12' } },
+      { plan: { modo: 'fijo', numero_cuotas: 12, dia: 5, primera: '2026-12' } },
+      { plan: { modo: 'fijo', cuota: 20, numero_cuotas: 12, dia: 32, primera: '2026-12' } },
+      { plan: { modo: 'fijo', cuota: 20, numero_cuotas: 1.5, dia: 5, primera: '2026-12' } },
+      { global: true },
+    ];
+    for (const [indice, extra] of casos.entries()) {
+      await assertFails(
+        setDoc(doc(db, 'compromisos', `malo-${indice}`), compromisoDe(UID_A, extra)),
+      );
+    }
+    await assertFails(setDoc(doc(db, 'compromisos', 'ajeno'), compromisoDe(UID_B)));
+  });
+
+  it('un plan fijo con cuota y uno variable sin cuota pasan; el cierre solo con valores válidos', async () => {
+    const db = sesion(UID_A);
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'compromisos', 'fijo'),
+        compromisoDe(UID_A, {
+          naturaleza: 'compra',
+          plan: { modo: 'fijo', cuota: 20, numero_cuotas: 24, dia: 19, primera: '2026-12' },
+        }),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'compromisos', 'variable'),
+        compromisoDe(UID_A, {
+          naturaleza: 'compra',
+          plan: { modo: 'variable', numero_cuotas: 12, dia: 5, primera: '2026-12' },
+        }),
+      ),
+    );
+    await assertSucceeds(setDoc(doc(db, 'compromisos', 'c-u'), compromisoDe(UID_A)));
+    await assertFails(updateDoc(doc(db, 'compromisos', 'c-u'), { cierre: 'pagado' }));
+    await assertSucceeds(updateDoc(doc(db, 'compromisos', 'c-u'), { cierre: 'perdonado' }));
+    // Reabrir (#135): el cierre sale del documento con deleteField.
+    await assertSucceeds(
+      updateDoc(doc(db, 'compromisos', 'c-u'), { cierre: deleteField() }),
+    );
+  });
+
+  it('los campos de amarre de transacciones pasan o no según las reglas', async () => {
+    const db = sesion(UID_A);
+    await assertFails(setDoc(doc(db, 'transacciones', 't-1'), transaccionDe(UID_A, { rol: 'abono' })));
+    await assertFails(
+      setDoc(doc(db, 'transacciones', 't-2'), transaccionDe(UID_A, { rol: 'otro', compromiso_id: 'c1' })),
+    );
+    await assertFails(setDoc(doc(db, 'transacciones', 't-3'), transaccionDe(UID_A, { neutral: 'si' })));
+    await assertSucceeds(
+      setDoc(
+        doc(db, 'transacciones', 't-4'),
+        transaccionDe(UID_A, { compromiso_id: 'c1', rol: 'origen', neutral: true }),
+      ),
+    );
+  });
+
+  it('consultaCompromisosPorDuenio funciona sin índice y solo trae los del dueño', async () => {
+    await entorno.withSecurityRulesDisabled(async (contexto) => {
+      const db = contexto.firestore();
+      await setDoc(doc(db, 'compromisos', 'c-a-1'), compromisoDe(UID_A));
+      await setDoc(doc(db, 'compromisos', 'c-b-1'), compromisoDe(UID_B));
+    });
+    const a = sesion(UID_A);
+    const b = sesion(UID_B);
+    const deA = await assertSucceeds(getDocs(consultaCompromisosPorDuenio(a, UID_A)));
+    expect(deA.docs.map((documento) => documento.id)).toEqual(['c-a-1']);
+    const deB = await assertSucceeds(getDocs(consultaCompromisosPorDuenio(b, UID_B)));
+    expect(deB.docs.map((documento) => documento.id)).toEqual(['c-b-1']);
+    await assertFails(getDocs(consultaCompromisosPorDuenio(a, UID_B)));
   });
 });

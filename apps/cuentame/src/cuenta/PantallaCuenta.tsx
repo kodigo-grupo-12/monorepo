@@ -129,6 +129,7 @@ export function PantallaCuenta() {
   // placeholder porque no tiene pantalla todavía.
   const verCategorias = () => enrutador.push('/cuenta/categorias');
   const verCarteras = () => enrutador.push('/carteras');
+  const verDeudas = () => enrutador.push('/deudas');
   const verConfiguracion = () => enrutador.push('/cuenta/configuracion');
   const verAcerca = () => enrutador.push('/cuenta/acerca');
 
@@ -170,6 +171,7 @@ export function PantallaCuenta() {
 
       <View>
         <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verCarteras} />
+        <Fila etiqueta="Deudas y préstamos" icono={<IconoSigno signo="$" />} alTocar={verDeudas} />
         <Fila etiqueta="Categorías" icono={<IconoCaja />} alTocar={verCategorias} />
       </View>
 

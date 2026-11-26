@@ -33,6 +33,10 @@ export interface Transaccion {
   categoria_id?: string; // referencia a «categorias» (T007)
   cartera_id?: string; // referencia a «carteras» (T007)
   imagen?: string; // base64
+  // Amarre a un compromiso (ADR-0019), escrito solo al crear.
+  compromiso_id?: string;
+  rol?: 'origen' | 'abono';
+  neutral?: boolean;
 }
 
 export const coleccionTransacciones = collection(db, COLECCION_TRANSACCIONES);
