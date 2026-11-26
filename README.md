@@ -71,6 +71,26 @@ Llena los cinco valores desde Firebase console > Configuración del proyecto > G
 - Para el MVP con Expo Go no hace falta `google-services.json`; solo se necesita en builds nativas.
 - La app arranca con la cuenta demo.
 
+Las reglas de Firestore se prueban en el emulador (hace falta Java):
+
+```bash
+pnpm test:reglas
+```
+
+Esa suite es el gate junto al typecheck en el workflow `ci-pr`. No despliega nada.
+
+### Reglas e índices de Firestore
+
+Viven en `firestore.rules` y `firestore.indexes.json`. El único comando que las sube al proyecto `kodigo-grupo12` es:
+
+```bash
+make deploy-firestore
+```
+
+Envuelve `firebase deploy --only firestore:rules,firestore:indexes --project kodigo-grupo12`. Es manual: solo se corre con la orden explícita de Roberto, a más tardar el 2026-12-20. El CI no lo ejecuta. Mientras tanto las reglas se validan solo en el emulador (`pnpm test:reglas` usa `--project demo-cuentame`).
+
+`.firebaserc` deja `kodigo-grupo12` como proyecto por defecto. Cualquier comando `firebase` sin `--project` apunta a producción.
+
 ## Estructura
 
 ```

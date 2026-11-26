@@ -5,11 +5,17 @@
   "engines": {
     "node": ">=22.13"
   },
+  "type": "module",
   "scripts": {
     "start": "turbo run start --filter=cuentame",
-    "typecheck": "turbo run typecheck --filter=cuentame"
+    "typecheck": "turbo run typecheck --filter=cuentame",
+    "test:reglas": "firebase emulators:exec --only firestore --project demo-cuentame \"pnpm exec vitest run\""
   },
   "devDependencies": {
-    "turbo": "^2.7.4"
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^13.4.0",
+    "firebase-tools": "^14.27.0",
+    "turbo": "^2.7.4",
+    "vitest": "^4.0.8"
   }
 }

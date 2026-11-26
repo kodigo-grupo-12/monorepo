@@ -1,12 +1,9 @@
-# Gate de CI en PRs: typecheck del paquete cuentame.
-# Detecta en el PR lo que el export de Pages solo descubre después del
-# merge (p. ej. un rename que deja un import sin resolver).
+# Gate de CI en PRs: typecheck del paquete cuentame y reglas de Firestore
+# contra el emulador. Nada aquí despliega al proyecto kodigo-grupo12.
 name: ci-pr
 
 on:
   pull_request:
-    paths:
-      - "apps/cuentame/**"
 
 permissions:
   contents: read
@@ -32,3 +29,30 @@ jobs:
 
       - name: Typecheck
         run: pnpm --filter cuentame typecheck
+
+  reglas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar el código
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Java (emulador de Firestore)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Suite de reglas (emulador)
+        run: pnpm test:reglas
