@@ -146,15 +146,6 @@ export function PantallaCuenta() {
     >
       <View style={estilos.encabezado}>
         <Text style={[estilos.encabezadoTitulo, { color: paleta.texto }]}>Cuenta</Text>
-        <Pressable
-          style={estilos.encabezadoSoporte}
-          accessibilityRole="button"
-          accessibilityLabel="Soporte"
-          onPress={verDesarrollo}
-        >
-          <Text style={[estilos.encabezadoSoporteTexto, { color: paleta.texto }]}>Soporte</Text>
-          <IconoSigno signo="?" />
-        </Pressable>
       </View>
       <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
 
@@ -177,18 +168,13 @@ export function PantallaCuenta() {
 
       <View>
         <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verCarteras} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
         <Fila etiqueta="Categorías" icono={<IconoCaja />} alTocar={verCategorias} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
       <View style={estilos.grupo}>
         <Fila etiqueta="Soporte" icono={<IconoSigno signo="?" />} alTocar={verDesarrollo} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
         <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verConfiguracion} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
         <Fila etiqueta="Acerca" icono={<IconoSigno signo="i" />} alTocar={verAcerca} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
       <View style={estilos.grupoSalida}>
@@ -203,9 +189,6 @@ const estilos = StyleSheet.create({
     flex: 1,
   },
   encabezado: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 14,
@@ -213,14 +196,6 @@ const estilos = StyleSheet.create({
   encabezadoTitulo: {
     fontSize: 32,
     fontWeight: '700',
-  },
-  encabezadoSoporte: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  encabezadoSoporteTexto: {
-    fontSize: 17,
   },
   linea: {
     height: StyleSheet.hairlineWidth,
@@ -289,6 +264,10 @@ const estilos = StyleSheet.create({
     paddingBottom: 8,
   },
   fila: {
+    backgroundColor: paleta.tarjeta,
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginBottom: 10,
     paddingHorizontal: 20,
     paddingVertical: 20,
   },
