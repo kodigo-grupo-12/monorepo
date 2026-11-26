@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  avisoAlBorrar,
   abonadoDe,
   abonosDe,
   diasDeAtraso,
@@ -233,5 +234,33 @@ describe('validarNuevoMonto', () => {
     expect(validarNuevoMonto(19.99, 20)).toBe('menor_que_abonado');
     expect(validarNuevoMonto(20, 20)).toBe('ok');
     expect(validarNuevoMonto(20.01, 20)).toBe('ok');
+  });
+});
+
+describe('avisoAlBorrar', () => {
+  it('el origen de un préstamo propio avisa que es la salida', () => {
+    const compromisos = [compromiso({ id: 'c1', contraparte: 'Juan' })];
+    expect(
+      avisoAlBorrar(transaccion({ id: 't1', compromiso_id: 'c1', rol: 'origen', monto: 50 }), compromisos),
+    ).toBe('Es la salida del préstamo a Juan. El préstamo sigue en «Deudas y préstamos», sin esta transacción.');
+  });
+
+  it('el abono avisa cuánto sube lo pendiente', () => {
+    const compromisos = [compromiso({ id: 'c1', contraparte: 'Juan' })];
+    expect(
+      avisoAlBorrar(transaccion({ id: 't1', compromiso_id: 'c1', rol: 'abono', monto: 20 }), compromisos),
+    ).toBe('Es un abono a Juan: lo pendiente sube $20.00.');
+  });
+
+  it('el origen de una deuda propia avisa que es la entrada', () => {
+    const compromisos = [compromiso({ id: 'c1', direccion: 'debo', contraparte: 'Ana' })];
+    expect(
+      avisoAlBorrar(transaccion({ id: 't1', compromiso_id: 'c1', rol: 'origen', monto: 30 }), compromisos),
+    ).toBe('Es la entrada del préstamo de Ana. El préstamo sigue en «Deudas y préstamos», sin esta transacción.');
+  });
+
+  it('una transacción suelta no lleva aviso', () => {
+    expect(avisoAlBorrar(transaccion(), [compromiso()])).toBeUndefined();
+    expect(avisoAlBorrar(transaccion({ compromiso_id: 'otro', rol: 'origen' }), [compromiso()])).toBeUndefined();
   });
 });

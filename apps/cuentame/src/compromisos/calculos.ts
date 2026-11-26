@@ -169,6 +169,27 @@ export function validarNuevoMonto(monto: number, abonado: number): 'ok' | 'menor
   return Math.round(monto * 100) < Math.round(abonado * 100) ? 'menor_que_abonado' : 'ok';
 }
 
+// El aviso del diálogo de borrar (#136): para una transacción amarrada le
+// dice qué pasa con el compromiso si se la borra; para una suelta, nada.
+export function avisoAlBorrar(
+  transaccion: Transaccion,
+  compromisos: Compromiso[],
+): string | undefined {
+  const compromiso = compromisos.find((c) => c.id === transaccion.compromiso_id);
+  if (!compromiso) {
+    return undefined;
+  }
+  if (transaccion.rol === 'origen') {
+    return compromiso.direccion === 'me_deben'
+      ? `Es la salida del préstamo a ${compromiso.contraparte}. El préstamo sigue en «Deudas y préstamos», sin esta transacción.`
+      : `Es la entrada del préstamo de ${compromiso.contraparte}. El préstamo sigue en «Deudas y préstamos», sin esta transacción.`;
+  }
+  if (transaccion.rol === 'abono') {
+    return `Es un abono a ${compromiso.contraparte}: lo pendiente sube $${transaccion.monto.toFixed(2)}.`;
+  }
+  return undefined;
+}
+
 export function resumenCompromisos(
   compromisos: Compromiso[],
   transacciones: Transaccion[],

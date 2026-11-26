@@ -31,6 +31,8 @@ import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 import { ContadorAnimado } from '../animaciones/ContadorAnimado';
 import { Esqueleto } from '../animaciones/Esqueleto';
 import { useAjustes } from '../ajustes/ProveedorAjustes';
+import { avisoAlBorrar, esMovimientoReal } from '../compromisos/calculos';
+import { useCompromisos } from '../datos/useCompromisos';
 
 type Periodo = 'semana' | 'mes';
 
@@ -45,6 +47,7 @@ export function PantallaInicio() {
   const { transacciones, cargando, error } = useTransacciones();
   const { categorias } = useCategorias();
   const { carteras } = useCarteras();
+  const { compromisos } = useCompromisos();
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   // El ojito (T010): alterna montos ↔ ***** en todo el Inicio por
@@ -182,8 +185,10 @@ export function PantallaInicio() {
   );
   const enConjunto = new Set(dias);
   const enConjuntoAnterior = new Set(diasAnteriores);
+  // El análisis usa solo movimientos reales (ADR-0019): un préstamo no es gasto ni ingreso, aunque sí mueve el saldo.
+  const reales = transacciones.filter(esMovimientoReal);
   const gastoEn = (conjunto: Set<string>): number =>
-    transacciones.reduce(
+    reales.reduce(
       (total, transaccion) =>
         transaccion.tipo === 'gasto' && conjunto.has(transaccion.fecha) ? total + transaccion.monto : total,
       0,
@@ -191,7 +196,7 @@ export function PantallaInicio() {
   const gastoActual = gastoEn(enConjunto);
   const gastoAnterior = gastoEn(enConjuntoAnterior);
   const gastoPorDia = dias.map((iso) =>
-    transacciones.reduce(
+    reales.reduce(
       (total, transaccion) =>
         transaccion.tipo === 'gasto' && transaccion.fecha === iso ? total + transaccion.monto : total,
       0,
@@ -225,7 +230,7 @@ export function PantallaInicio() {
   const conjuntoMesGasto = new Set(diasDe('mes', new Date()));
   const gastoPorCategoria = new Map<string, number>();
   let gastoTotalGasto = 0;
-  for (const transaccion of transacciones) {
+  for (const transaccion of reales) {
     if (transaccion.tipo !== 'gasto' || !conjuntoMesGasto.has(transaccion.fecha)) {
       continue;
     }
@@ -289,6 +294,8 @@ export function PantallaInicio() {
     opacidadSaldo.setValue(0.25);
     Animated.timing(opacidadSaldo, { toValue: 1, duration: 220, useNativeDriver: true }).start();
   }, [montosVisibles, ajustes.animaciones, opacidadSaldo]);
+
+  const avisoBorrado = pendiente ? avisoAlBorrar(pendiente, compromisos) : undefined;
 
   return (
     <View style={[estilos.contenedor, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
@@ -594,6 +601,9 @@ export function PantallaInicio() {
               <Text style={[estilos.detalleDialogo, { color: paleta.textoSuave }]} numberOfLines={1}>
                 {pendiente.nota ?? (pendiente.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')} · ${pendiente.monto.toFixed(2)}
               </Text>
+            ) : null}
+            {avisoBorrado ? (
+              <Text style={[estilos.detalleDialogo, { color: paleta.textoSuave }]}>{avisoBorrado}</Text>
             ) : null}
             <View style={estilos.botonesDialogo}>
               <Pressable
