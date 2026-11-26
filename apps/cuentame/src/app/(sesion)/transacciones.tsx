@@ -1,6 +1,6 @@
-import { PantallaPlaceholder } from '../../desarrollo/PantallaPlaceholder';
+import { PantallaTransacciones } from '../../transacciones/PantallaTransacciones';
 
-// Raíz de tab: el placeholder sin botón de atrás.
+// Raíz de tab: la pantalla real de Transacciones (T009), sin botón de atrás.
 export default function RutaTransacciones() {
-  return <PantallaPlaceholder />;
+  return <PantallaTransacciones />;
 }
