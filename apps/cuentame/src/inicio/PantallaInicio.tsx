@@ -52,8 +52,8 @@ export function PantallaInicio() {
   const [montosVisibles, setMontosVisibles] = useState(true);
   const [periodoGrafico, setPeriodoGrafico] = useState<Periodo>('semana');
 
-  // La papelera marca la transacción; el diálogo decide. Cancelar no toca
-  // nada y no hay deshacer (ADR-0012).
+  // La presión larga marca la transacción; el diálogo decide. Cancelar no
+  // toca nada y no hay deshacer (ADR-0012).
   const [pendiente, setPendiente] = useState<Transaccion>();
   const [eliminando, setEliminando] = useState(false);
   // Tocar la fila (fuera de la papelera) abre el modal en modo edición con
@@ -246,6 +246,32 @@ export function PantallaInicio() {
     }));
 
   const recientes = transacciones.slice(0, 5);
+
+  // Recientes agrupadas por día (T012, #120): Hoy, Ayer o la fecha
+  // explícita. Los grupos se arman en orden porque la lista ya viene
+  // descendente por fecha.
+  const etiquetaDeDia = (iso: string): string => {
+    if (iso === hoyISO()) {
+      return 'Hoy';
+    }
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    if (iso === aISO(ayer)) {
+      return 'Ayer';
+    }
+    const fecha = deISO(iso);
+    const año = fecha.getFullYear() === new Date().getFullYear() ? '' : ` ${fecha.getFullYear()}`;
+    return `${fecha.getDate()} ${MESES[fecha.getMonth()]}${año}`;
+  };
+  const gruposRecientes: { etiqueta: string; items: Transaccion[] }[] = [];
+  for (const reciente of recientes) {
+    const ultimo = gruposRecientes[gruposRecientes.length - 1];
+    if (ultimo && ultimo.items[0].fecha === reciente.fecha) {
+      ultimo.items.push(reciente);
+    } else {
+      gruposRecientes.push({ etiqueta: etiquetaDeDia(reciente.fecha), items: [reciente] });
+    }
+  }
 
   const saldoTexto = (monto: number): string =>
     montosVisibles ? `$ ${monto < 0 ? '-' : ''}${Math.abs(monto).toFixed(2)}` : MONTOS_OCULTOS;
@@ -507,21 +533,36 @@ export function PantallaInicio() {
               <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>
                 Transacciones recientes
               </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ver todo, Transacciones"
+                onPress={() => enrutador.push('/transacciones')}
+                hitSlop={6}
+              >
+                <Text style={[estilos.enlace, { color: paleta.verdeAccion }]}>Ver todo</Text>
+              </Pressable>
             </View>
             <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
-              {recientes.map((reciente) => (
-                <FilaReciente
-                  key={reciente.id ?? `${reciente.fecha}-${reciente.monto}`}
-                  transaccion={reciente}
-                  nombreCategoria={
-                    reciente.categoria_id
-                      ? nombresDeCategoria.get(reciente.categoria_id)
-                      : undefined
-                  }
-                  montosVisibles={montosVisibles}
-                  alEditar={() => setSeleccionada(reciente)}
-                  alEliminar={() => setPendiente(reciente)}
-                />
+              {gruposRecientes.map((grupo) => (
+                <View key={grupo.etiqueta}>
+                  <Text style={[estilos.grupoReciente, { color: paleta.textoSuave }]}>
+                    {grupo.etiqueta}
+                  </Text>
+                  {grupo.items.map((reciente) => (
+                    <FilaReciente
+                      key={reciente.id ?? `${reciente.fecha}-${reciente.monto}`}
+                      transaccion={reciente}
+                      nombreCategoria={
+                        reciente.categoria_id
+                          ? nombresDeCategoria.get(reciente.categoria_id)
+                          : undefined
+                      }
+                      montosVisibles={montosVisibles}
+                      alEditar={() => setSeleccionada(reciente)}
+                      alEliminar={() => setPendiente(reciente)}
+                    />
+                  ))}
+                </View>
               ))}
             </View>
           </>
@@ -663,10 +704,12 @@ function GlifoEscudo() {
   );
 }
 
-// Fila de Transacciones recientes: círculo con glifo y color de la
-// categoría (mapa fijo T007), título = categoría, subtítulo = fecha de la
-// transacción y monto coloreado como MoneyLover (ingresos azul, gastos
-// rojo). Con el ojito oculto el monto pasa a ***** conservando su color.
+// Fila de Transacciones recientes (T012, #120): círculo con glifo y color
+// de la categoría (mapa fijo T007), título = categoría, subtítulo = fecha
+// y monto coloreado como MoneyLover (ingresos azul, gastos rojo). Tocar
+// edita (ADR-0012) y la presión larga abre el diálogo de eliminar: la
+// papelera expuesta del ADR-0012 queda revocada en Inicio. Con el ojito
+// oculto el monto pasa a ***** conservando su color.
 function FilaReciente({
   transaccion,
   nombreCategoria,
@@ -682,60 +725,35 @@ function FilaReciente({
 }) {
   const fecha = deISO(transaccion.fecha);
 
-  // En web cada Pressable es un <button>. La papelera va como hermana de
-  // la zona de edición, no adentro: un botón HTML no puede anidar otro.
+  // Un solo Pressable: en web cada Pressable es un <button> y no puede
+  // anidar otro, así que la papelera expuesta también estorbaba ahí.
   return (
-    <View style={estilos.filaReciente}>
-      <Pressable
-        style={estilos.cuerpoReciente}
-        accessibilityRole="button"
-        accessibilityLabel="Editar transacción"
-        onPress={alEditar}
-      >
-        <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
-        <View style={estilos.detallesReciente}>
-          <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
-            {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
-          </Text>
-          <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
-            {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
-          </Text>
-        </View>
-        <Text
-          style={[
-            estilos.montoReciente,
-            { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
-          ]}
-        >
-          {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
+    <Pressable
+      style={estilos.filaReciente}
+      accessibilityRole="button"
+      accessibilityLabel="Editar transacción"
+      accessibilityHint="Mantén presionado para eliminar"
+      onPress={alEditar}
+      onLongPress={alEliminar}
+    >
+      <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
+      <View style={estilos.detallesReciente}>
+        <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
+          {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
         </Text>
-      </Pressable>
-      <Pressable
-        style={estilos.papeleraReciente}
-        accessibilityRole="button"
-        accessibilityLabel="Eliminar transacción"
-        onPress={alEliminar}
-        hitSlop={6}
+        <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
+          {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
+        </Text>
+      </View>
+      <Text
+        style={[
+          estilos.montoReciente,
+          { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
+        ]}
       >
-        <GlifoPapelera />
-      </Pressable>
-    </View>
-  );
-}
-
-// Papelera dibujada con vistas, como quedó en la T004: Expo SDK 58 ya no
-// trae un set de iconos y no se agrega ninguna dependencia nueva.
-function GlifoPapelera() {
-  const verde = paleta.verdeAccion;
-
-  return (
-    <View style={estilos.papelera}>
-      <View style={[estilos.papeleraAsa, { backgroundColor: verde }]} />
-      <View style={[estilos.papeleraTapa, { backgroundColor: verde }]} />
-      <View style={[estilos.papeleraCuerpo, { borderColor: verde }]} />
-      <View style={[estilos.papeleraLinea, { backgroundColor: verde, left: 7 }]} />
-      <View style={[estilos.papeleraLinea, { backgroundColor: verde, left: 11 }]} />
-    </View>
+        {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1050,15 +1068,15 @@ const estilos = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
+  grupoReciente: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 14,
+  },
   filaReciente: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 14,
-  },
-  cuerpoReciente: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 10,
   },
   detallesReciente: {
     flex: 1,
@@ -1072,53 +1090,10 @@ const estilos = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  papeleraReciente: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   montoReciente: {
     fontSize: 16,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-  },
-  papelera: {
-    width: 20,
-    height: 22,
-  },
-  papeleraAsa: {
-    position: 'absolute',
-    top: 0,
-    left: 7,
-    width: 6,
-    height: 2,
-    borderRadius: 1,
-  },
-  papeleraTapa: {
-    position: 'absolute',
-    top: 3,
-    left: 0,
-    width: 20,
-    height: 2,
-    borderRadius: 1,
-  },
-  papeleraCuerpo: {
-    position: 'absolute',
-    top: 6,
-    left: 3,
-    width: 14,
-    height: 14,
-    borderWidth: 2,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-  },
-  papeleraLinea: {
-    position: 'absolute',
-    top: 9,
-    width: 2,
-    height: 7,
   },
   fondoDialogo: {
     flex: 1,
