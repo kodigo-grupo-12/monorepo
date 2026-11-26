@@ -24,7 +24,7 @@ import type { Transaccion } from '../datos/transacciones';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { IconoCartera } from '../carteras/IconoCartera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
-import { MESES, aISO, deISO } from '../transacciones/fechas';
+import { DIAS_ABREV, MESES, aISO, deISO, hoyISO } from '../transacciones/fechas';
 import { mostrarAviso } from '../avisos/avisos';
 import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 import { ContadorAnimado } from '../animaciones/ContadorAnimado';
@@ -57,8 +57,10 @@ export function PantallaInicio() {
   const [pendiente, setPendiente] = useState<Transaccion>();
   const [eliminando, setEliminando] = useState(false);
   // Tocar la fila (fuera de la papelera) abre el modal en modo edición con
-  // el documento precargado (ADR-0012).
+  // el documento precargado (ADR-0012). El mismo modal, sin precarga,
+  // sirve para anotar el primer gasto desde el gráfico vacío (T012, #117).
   const [seleccionada, setSeleccionada] = useState<Transaccion>();
+  const [modalAbierto, setModalAbierto] = useState(false);
 
   // Toast «En desarrollo» (T005), para los enlaces que no construyen
   // pantalla en esta pasada.
@@ -184,6 +186,8 @@ export function PantallaInicio() {
     ),
   );
   const topeDia = Math.max(...gastoPorDia, 0);
+  // Promedio del período para la línea del gráfico (T012, #117).
+  const promedioDia = gastoActual / dias.length;
   // Delta real (T012, #116): el gasto del período contra el inmediato
   // anterior de la misma longitud. Si ningún período tiene datos no se
   // inventa número: el delta simplemente no se muestra. Con el período
@@ -333,29 +337,68 @@ export function PantallaInicio() {
               </>
             ) : null}
           </View>
-          {/* Vacío, como en el modelo: barras fantasma y el texto de
-              invitación. Con datos, una barra verde por día. */}
+          {/* Vacío (T012, #117): el cerdito y la invitación a anotar el
+              primer gasto; nunca barras fantasma que parezcan datos. Con
+              datos, una barra por día: la de hoy en verde, el resto en
+              gris, y el promedio del período marcado con línea. Tocar una
+              barra abre Transacciones en ese día. */}
           {gastoActual === 0 ? (
             <View style={estilos.graficoVacio}>
-              <View style={estilos.graficoFantasmas}>
-                <View style={[estilos.graficoFantasma, { backgroundColor: paleta.barraFantasma }]} />
-                <View style={[estilos.graficoFantasma, { backgroundColor: paleta.barraFantasma }]} />
-              </View>
+              <GlifoCerdito />
               <Text style={[estilos.graficoVacioTexto, { color: paleta.textoSuave }]}>
-                Introduzca las transacciones para ver el informe
+                Sin gastos {periodoGrafico === 'semana' ? 'esta semana' : 'este mes'}
               </Text>
+              <Pressable
+                style={estilos.botonCerdito}
+                accessibilityRole="button"
+                accessibilityLabel="Anota tu primer gasto"
+                onPress={() => setModalAbierto(true)}
+              >
+                <Text style={estilos.botonCerditoTexto}>Anota tu primer gasto</Text>
+              </Pressable>
             </View>
           ) : (
-            <View style={estilos.graficoBarras}>
-              {gastoPorDia.map((gasto, indice) => (
-                <View
-                  key={dias[indice]}
-                  style={[
-                    estilos.graficoBarra,
-                    { height: topeDia > 0 ? Math.max(3, (gasto / topeDia) * 72) : 3, backgroundColor: paleta.verdeAccion },
-                  ]}
-                />
-              ))}
+            <View>
+              <View style={estilos.graficoBarras}>
+                {gastoPorDia.map((gasto, indice) => {
+                  const iso = dias[indice];
+                  return (
+                    <Pressable
+                      key={iso}
+                      style={estilos.graficoBarraZona}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Gastos del día ${iso}`}
+                      onPress={() => enrutador.push(`/transacciones?dia=${iso}`)}
+                    >
+                      <View
+                        style={[
+                          estilos.graficoBarra,
+                          {
+                            height: topeDia > 0 ? Math.max(3, (gasto / topeDia) * 72) : 3,
+                            backgroundColor: iso === hoyISO() ? paleta.verdeAccion : paleta.puntoInactivo,
+                          },
+                        ]}
+                      />
+                      {periodoGrafico === 'semana' ? (
+                        <Text style={[estilos.graficoInicial, { color: paleta.textoSuave }]}>
+                          {DIAS_ABREV[deISO(iso).getDay()][0]}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+                {topeDia > 0 ? (
+                  <View
+                    style={[
+                      estilos.graficoPromedio,
+                      { bottom: (promedioDia / topeDia) * 72, borderTopColor: paleta.textoSuave },
+                    ]}
+                  />
+                ) : null}
+              </View>
+              <Text style={[estilos.graficoPromedioTexto, { color: paleta.textoSuave }]}>
+                Promedio {montosVisibles ? `$ ${promedioDia.toFixed(2)}` : MONTOS_OCULTOS}
+              </Text>
             </View>
           )}
         </View>
@@ -482,8 +525,11 @@ export function PantallaInicio() {
       </Modal>
 
       <ModalAgregarTransaccion
-        visible={!!seleccionada}
-        alCerrar={() => setSeleccionada(undefined)}
+        visible={modalAbierto || !!seleccionada}
+        alCerrar={() => {
+          setModalAbierto(false);
+          setSeleccionada(undefined);
+        }}
         transaccion={seleccionada}
       />
     </View>
@@ -531,6 +577,21 @@ function GlifoOjo() {
     <View style={estilos.ojito}>
       <View style={[estilos.ojitoPestana, { borderColor: paleta.textoSuave }]} />
       <View style={[estilos.ojitoPupila, { backgroundColor: paleta.textoSuave }]} />
+    </View>
+  );
+}
+
+// Cerdito dibujado con vistas (T012, #117): el estado vacío del gráfico
+// invita a anotar el primer gasto en vez de fingir barras. Mismo criterio
+// del repo: sin dependencias nuevas, nada pedido por URL.
+function GlifoCerdito() {
+  return (
+    <View style={estilos.cerdito}>
+      <View style={[estilos.cerditoCuerpo, { borderColor: paleta.verdeAccion }]} />
+      <View style={[estilos.cerditoRanura, { backgroundColor: paleta.verdeAccion }]} />
+      <View style={[estilos.cerditoHocico, { backgroundColor: paleta.verdeAccion }]} />
+      <View style={[estilos.cerditoPata, { backgroundColor: paleta.verdeAccion, left: 14 }]} />
+      <View style={[estilos.cerditoPata, { backgroundColor: paleta.verdeAccion, right: 14 }]} />
     </View>
   );
 }
@@ -754,19 +815,59 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
   },
-  graficoFantasmas: {
-    flexDirection: 'row',
-    gap: 26,
-  },
-  graficoFantasma: {
-    width: 100,
-    height: 64,
-    borderRadius: 16,
-  },
   graficoVacioTexto: {
     fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
+  },
+  botonCerdito: {
+    marginTop: 14,
+    backgroundColor: paleta.verdeAccion,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  botonCerditoTexto: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  cerdito: {
+    width: 56,
+    height: 44,
+    marginTop: 10,
+  },
+  cerditoCuerpo: {
+    position: 'absolute',
+    left: 2,
+    top: 8,
+    width: 50,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  cerditoRanura: {
+    position: 'absolute',
+    top: 4,
+    left: 20,
+    width: 14,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  cerditoHocico: {
+    position: 'absolute',
+    top: 18,
+    right: 0,
+    width: 12,
+    height: 10,
+    borderRadius: 6,
+  },
+  cerditoPata: {
+    position: 'absolute',
+    bottom: 0,
+    width: 6,
+    height: 6,
+    borderRadius: 2,
   },
   graficoBarras: {
     flexDirection: 'row',
@@ -774,11 +875,31 @@ const estilos = StyleSheet.create({
     gap: 4,
     height: 76,
     marginTop: 16,
+    position: 'relative',
+  },
+  graficoBarraZona: {
+    flex: 1,
+    alignItems: 'center',
   },
   graficoBarra: {
-    flex: 1,
+    alignSelf: 'stretch',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
+  },
+  graficoInicial: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  graficoPromedio: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    borderStyle: 'dashed',
+  },
+  graficoPromedioTexto: {
+    fontSize: 12,
+    marginTop: 6,
   },
   filaGasto: {
     flexDirection: 'row',

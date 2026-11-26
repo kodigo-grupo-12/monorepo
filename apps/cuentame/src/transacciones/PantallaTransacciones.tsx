@@ -25,15 +25,21 @@ const ANCHO_DIA = 62;
 // resumen del día (Entrada azul / Salida roja), encabezado del día y filas
 // de solo lectura con montos coloreados como MoneyLover. Inicio no se toca:
 // editar y eliminar siguen viviendo ahí (ADR-0012).
-export function PantallaTransacciones() {
+// Desde la T012 (#117) la pantalla acepta un día inicial: tocar una barra
+// del gráfico de Inicio empuja /transacciones?dia=YYYY-MM-DD. La tira se
+// estira para contenerlo (ADR-0014).
+export function PantallaTransacciones({ diaInicial }: { diaInicial?: string } = {}) {
   const margenes = useSafeAreaInsets();
   const { transacciones } = useTransacciones();
   const { carteras } = useCarteras();
   const { categorias } = useCategorias();
 
-  // El día que se está viendo arranca en hoy; la tira y el calendario lo
-  // mueven. Sin cartera elegida se ve el Total.
-  const [diaISO, setDiaISO] = useState<string>(hoyISO());
+  // El día que se está viendo arranca en el día pedido (si es válido) o en
+  // hoy; la tira y el calendario lo mueven. Sin cartera elegida se ve el
+  // Total.
+  const [diaISO, setDiaISO] = useState<string>(
+    diaInicial && /^\d{4}-\d{2}-\d{2}$/.test(diaInicial) ? diaInicial : hoyISO(),
+  );
   const [carteraId, setCarteraId] = useState<string>();
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const [selectorAbierto, setSelectorAbierto] = useState(false);
