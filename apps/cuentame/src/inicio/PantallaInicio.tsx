@@ -184,10 +184,22 @@ export function PantallaInicio() {
     ),
   );
   const topeDia = Math.max(...gastoPorDia, 0);
-  // Sin datos previos el modelo muestra − 0%: mismo tratamiento cuando el
-  // porcentaje da cero.
-  const porcentaje = gastoAnterior > 0 ? Math.round(((gastoActual - gastoAnterior) / gastoAnterior) * 100) : 0;
-  const textoPorcentaje = porcentaje > 0 ? `+ ${porcentaje}%` : `− ${Math.abs(porcentaje)}%`;
+  // Delta real (T012, #116): el gasto del período contra el inmediato
+  // anterior de la misma longitud. Si ningún período tiene datos no se
+  // inventa número: el delta simplemente no se muestra. Con el período
+  // anterior vacío y gasto nuevo, el salto real es +100%.
+  const deltaVisible = gastoActual > 0 || gastoAnterior > 0;
+  const porcentaje =
+    gastoAnterior > 0
+      ? Math.round(((gastoActual - gastoAnterior) / gastoAnterior) * 100)
+      : gastoActual > 0
+        ? 100
+        : 0;
+  // Subir el gasto es mala noticia (rojo); bajarlo, buena (verde).
+  const colorDelta = porcentaje > 0 ? paleta.rojoMonto : porcentaje < 0 ? paleta.verdeMonto : paleta.textoSuave;
+  const textoDelta =
+    porcentaje > 0 ? `+${porcentaje}%` : porcentaje < 0 ? `−${Math.abs(porcentaje)}%` : '0%';
+  const etiquetaDelta = `vs. ${periodoGrafico === 'semana' ? 'semana' : 'mes'} anterior`;
 
   // Mayor gasto: top 3 de categorías por porcentaje del gasto del período.
   const conjuntoGasto = new Set(diasDe(periodoGasto, new Date()));
@@ -312,9 +324,14 @@ export function PantallaInicio() {
             <Text style={[estilos.graficoEtiqueta, { color: paleta.textoSuave }]}>
               Total gastado {periodoGrafico === 'semana' ? 'esta semana' : 'este mes'}
             </Text>
-            <Text style={[estilos.graficoPorcentaje, { color: paleta.amarilloCambio }]}>
-              {textoPorcentaje}
-            </Text>
+            {deltaVisible ? (
+              <>
+                <Text style={[estilos.graficoPorcentaje, { color: colorDelta }]}>
+                  {montosVisibles ? textoDelta : MONTOS_OCULTOS}
+                </Text>
+                <Text style={[estilos.deltaEtiqueta, { color: paleta.textoSuave }]}>{etiquetaDelta}</Text>
+              </>
+            ) : null}
           </View>
           {/* Vacío, como en el modelo: barras fantasma y el texto de
               invitación. Con datos, una barra verde por día. */}
@@ -727,6 +744,11 @@ const estilos = StyleSheet.create({
   graficoPorcentaje: {
     fontSize: 16,
     fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  deltaEtiqueta: {
+    fontSize: 13,
+    marginLeft: 6,
   },
   graficoVacio: {
     alignItems: 'center',
