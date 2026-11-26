@@ -13,7 +13,7 @@ import { GlifoCategoria } from './GlifoCategoria';
 // GASTO/INGRESO con el activo en blanco y subrayado, fila verde para crear
 // y lista plana con círculo de color y glifo, sin chevron ni sub-niveles.
 // Pantalla empujada del tab Cuenta (ADR-0011): el navbar queda visible.
-export function PantallaCategorias() {
+export function PantallaCategorias({ soloLectura = false }: { soloLectura?: boolean }) {
   const margenes = useSafeAreaInsets();
   const enrutador = useRouter();
   const { categorias, cargando } = useCategorias();
@@ -62,17 +62,19 @@ export function PantallaCategorias() {
         ))}
       </View>
 
-      <Pressable
-        style={estilos.filaNueva}
-        accessibilityRole="button"
-        accessibilityLabel="Nueva categoría"
-        onPress={() => enrutador.push(`/nueva-categoria?tipo=${tipo}`)}
-      >
-        <View style={[estilos.circuloNueva, { backgroundColor: paleta.verdeAccion }]}>
-          <Text style={estilos.masNueva}>+</Text>
-        </View>
-        <Text style={[estilos.textoNueva, { color: paleta.verdeAccion }]}>NUEVA CATEGORÍA</Text>
-      </Pressable>
+      {!soloLectura ? (
+        <Pressable
+          style={estilos.filaNueva}
+          accessibilityRole="button"
+          accessibilityLabel="Nueva categoría"
+          onPress={() => enrutador.push(`/nueva-categoria?tipo=${tipo}`)}
+        >
+          <View style={[estilos.circuloNueva, { backgroundColor: paleta.verdeAccion }]}>
+            <Text style={estilos.masNueva}>+</Text>
+          </View>
+          <Text style={[estilos.textoNueva, { color: paleta.verdeAccion }]}>NUEVA CATEGORÍA</Text>
+        </Pressable>
+      ) : null}
 
       <ScrollView contentContainerStyle={estilos.lista}>
         {cargando ? null : visibles.map((categoria, indice) => (

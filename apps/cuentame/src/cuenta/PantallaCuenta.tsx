@@ -121,10 +121,15 @@ export function PantallaCuenta() {
   const enrutador = useRouter();
   const { salir } = useSesion();
   const verDesarrollo = () => enrutador.push('/desarrollo');
-  // Enmienda puntual a la T005 (ADR-0011): las filas de esta tarea empujan
-  // su pantalla real; el resto de filas sigue con el placeholder.
-  const verCategorias = () => enrutador.push('/categorias');
+  // Enmienda puntual a la T005 (ADR-0011), extendida por la T013: las
+  // filas empujan su pantalla real. Categorías se reutiliza de la T007 en
+  // modo lectura y Mis carteras es la misma pantalla de siempre; Acerca y
+  // Configuraciones son pantallas nuevas locales. Soporte sigue con el
+  // placeholder porque no tiene pantalla todavía.
+  const verCategorias = () => enrutador.push('/cuenta/categorias');
   const verCarteras = () => enrutador.push('/carteras');
+  const verConfiguracion = () => enrutador.push('/cuenta/configuracion');
+  const verAcerca = () => enrutador.push('/cuenta/acerca');
 
   // Sin confirmación (ADR-0008): al borrar la marca, la guardia del grupo con
   // sesión manda a la entrada y el splash reinicia el recorrido completo.
@@ -184,9 +189,9 @@ export function PantallaCuenta() {
       <View style={estilos.grupo}>
         <Fila etiqueta="Soporte" icono={<IconoSigno signo="?" />} alTocar={verDesarrollo} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verDesarrollo} />
+        <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verConfiguracion} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Acerca" icono={<IconoSigno signo="i" />} alTocar={verDesarrollo} />
+        <Fila etiqueta="Acerca" icono={<IconoSigno signo="i" />} alTocar={verAcerca} />
         <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
