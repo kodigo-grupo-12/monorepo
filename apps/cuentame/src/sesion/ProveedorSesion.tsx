@@ -92,6 +92,16 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
     };
   }, [uid]);
 
+  const entrar = async () => {
+    const siguiente = await entrarConGoogle();
+    setUsuario(siguiente);
+  };
+
+  const salir = async () => {
+    await salirDeAuth();
+    setUsuario(null);
+  };
+
   // Elige la persona una vez: siembra en un lote y la escucha viva cierra la
   // pantalla en cuanto aterriza. Falla en silencio (console.error) para no
   // bloquear la sesión; la guardia de sembrarArranque evita doble siembra.
