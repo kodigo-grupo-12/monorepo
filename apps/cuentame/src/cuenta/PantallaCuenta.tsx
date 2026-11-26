@@ -4,21 +4,17 @@ import { Presionable } from '../animaciones/Presionable';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { cuentaDemo } from '../sesion/cuentaDemo';
 import { useSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
 // Anatomía copiada de Assets/cuenta/modelo-pantalla-cuenta.png
 // (kodigo-grupo-12/.github): header con Cuenta y Soporte, perfil de la
-// cuenta demo (avatar con la inicial, banner CUENTA DEMO, nombre y correo),
+// cuenta de Google (avatar con la inicial, chip CUENTA DE GOOGLE, nombre y correo),
 // las listas Mis carteras/Categorías y Soporte/Configuraciones/Acerca, y
 // Cerrar sesión en rojo separada del grupo. Se copia el patrón, no los
 // assets ni las marcas ajenas. Los iconos van dibujados con vistas: Expo
 // SDK 58 ya no trae un set de iconos, no se agrega ninguna dependencia
-// nueva ni nada se pide por URL. Los datos del perfil salen de la cuenta
-// demo existente.
-
-const inicial = cuentaDemo.nombre.charAt(0).toUpperCase();
+// nueva ni nada se pide por URL. Los datos del perfil salen de la sesión.
 
 function IconoChevron() {
   return <View style={estilos.chevron} />;
@@ -81,11 +77,11 @@ function IconoApagado() {
 }
 
 function ChipDemo() {
-  // Chip limpio con borde verde (T013): la marca de cuenta demo se queda,
+  // Chip limpio con borde verde (T013): la marca de cuenta de Google se queda,
   // el banderín no.
   return (
     <View style={estilos.chip}>
-      <Text style={estilos.chipTexto}>CUENTA DEMO</Text>
+      <Text style={estilos.chipTexto}>CUENTA DE GOOGLE</Text>
     </View>
   );
 }
@@ -121,7 +117,10 @@ function Fila({
 export function PantallaCuenta() {
   const margenes = useSafeAreaInsets();
   const enrutador = useRouter();
-  const { salir } = useSesion();
+  const { salir, usuario } = useSesion();
+  const nombre = usuario?.nombre ?? '';
+  const correo = usuario?.correo ?? '';
+  const inicial = (nombre || correo).charAt(0).toUpperCase() || '?';
   const verDesarrollo = () => enrutador.push('/desarrollo');
   // Enmienda puntual a la T005 (ADR-0011), extendida por la T013: las
   // filas empujan su pantalla real. Categorías se reutiliza de la T007 en
@@ -164,8 +163,8 @@ export function PantallaCuenta() {
           </View>
         </View>
         <View style={estilos.perfilTextos}>
-          <Text style={[estilos.perfilNombre, { color: paleta.texto }]}>{cuentaDemo.nombre}</Text>
-          <Text style={[estilos.perfilCorreo, { color: paleta.textoSuave }]}>{cuentaDemo.correo}</Text>
+          <Text style={[estilos.perfilNombre, { color: paleta.texto }]}>{nombre}</Text>
+          <Text style={[estilos.perfilCorreo, { color: paleta.textoSuave }]}>{correo}</Text>
         </View>
       </View>
 

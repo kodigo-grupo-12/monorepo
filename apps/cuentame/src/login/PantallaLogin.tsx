@@ -1,55 +1,49 @@
-import { useRef, useState, type ComponentRef } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { cuentaDemo } from '../sesion/cuentaDemo';
+import { mensajeDeErrorDeLogin } from '../sesion/mensajeDeErrorDeLogin';
 import { useSesion } from '../sesion/ProveedorSesion';
 import { paleta } from '../tema/colores';
 
-const AVISO_DEMO = 'Ese correo o esa contraseña no son los de la cuenta demo.';
-const AVISO_ETAPA = 'En esta etapa solo entra la cuenta demo.';
+const AVISO_SOLO_WEB = 'Por ahora Cuéntame se usa en el navegador.';
+const enWeb = Platform.OS === 'web';
 
 export function PantallaLogin() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
-  const { entrar } = useSesion();
-  const desplazamiento = useRef<ComponentRef<typeof ScrollView>>(null);
+  const { entrar, activa } = useSesion();
   const entrando = useRef(false);
-  const [correo, setCorreo] = useState<string>(cuentaDemo.correo);
-  const [contrasena, setContrasena] = useState<string>(cuentaDemo.contrasena);
-  const [oculta, setOculta] = useState(true);
-  const [aviso, setAviso] = useState('');
+  const [aviso, setAviso] = useState(enWeb ? '' : AVISO_SOLO_WEB);
 
-  const irAlBoton = () => {
-    desplazamiento.current?.scrollToEnd({ animated: true });
-  };
+  // Si Auth abre la sesión (aunque entrar() se haya rechazado por un foco
+  // prematuro), Login no se queda atrás: va al inicio.
+  useEffect(() => {
+    if (activa) {
+      enrutador.replace('/');
+    }
+  }, [activa, enrutador]);
 
   const iniciar = async () => {
-    if (entrando.current) {
-      return;
-    }
-
-    if (correo !== cuentaDemo.correo || contrasena !== cuentaDemo.contrasena) {
-      setAviso(AVISO_DEMO);
+    if (!enWeb || entrando.current) {
       return;
     }
 
     entrando.current = true;
-    await entrar();
-    enrutador.replace('/');
+    setAviso('');
+    try {
+      await entrar();
+      enrutador.replace('/');
+    } catch (error) {
+      setAviso(mensajeDeErrorDeLogin(error));
+    } finally {
+      entrando.current = false;
+    }
   };
 
   return (
     <ScrollView
-      ref={desplazamiento}
       style={{ backgroundColor: paleta.fondo }}
       contentContainerStyle={[
         estilos.contenido,
@@ -59,7 +53,6 @@ export function PantallaLogin() {
         },
       ]}
       keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
     >
       <Pressable
         accessibilityRole="button"
@@ -72,75 +65,24 @@ export function PantallaLogin() {
 
       <Text style={[estilos.titulo, { color: paleta.texto }]}>Inicio de sesión</Text>
 
-      <Text style={[estilos.etiqueta, { color: paleta.textoSuave }]}>E-mail</Text>
-      <TextInput
-        value={correo}
-        onChangeText={setCorreo}
-        onFocus={irAlBoton}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        accessibilityLabel="E-mail"
-        style={[estilos.campo, { color: paleta.texto, borderBottomColor: paleta.textoSuave }]}
-      />
-
-      <Text style={[estilos.etiqueta, estilos.espacio, { color: paleta.textoSuave }]}>Contraseña</Text>
-      <View style={[estilos.filaClave, { borderBottomColor: paleta.textoSuave }]}>
-        <TextInput
-          value={contrasena}
-          onChangeText={setContrasena}
-          onFocus={irAlBoton}
-          secureTextEntry={oculta}
-          autoCapitalize="none"
-          autoCorrect={false}
-          accessibilityLabel="Contraseña"
-          style={[estilos.clave, { color: paleta.texto }]}
-        />
+      {enWeb ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={oculta ? 'mostrar contraseña' : 'ocultar contraseña'}
-          onPress={() => setOculta((valor) => !valor)}
-          hitSlop={8}
+          accessibilityLabel="Continuar con Google"
+          onPress={() => {
+            void iniciar();
+          }}
+          style={[estilos.boton, { backgroundColor: paleta.verdeLogin }]}
         >
-          <Text style={[estilos.ojo, { color: paleta.texto }]}>{oculta ? '👁' : '👁‍🗨'}</Text>
+          <Text style={estilos.botonTexto}>Continuar con Google</Text>
         </Pressable>
-      </View>
+      ) : null}
 
       {aviso ? (
         <Text accessibilityLiveRegion="polite" style={estilos.aviso}>
           {aviso}
         </Text>
       ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="INICIO DE SESIÓN"
-        onPress={() => {
-          void iniciar();
-        }}
-        style={[estilos.boton, { backgroundColor: paleta.verdeLogin }]}
-      >
-        <Text style={estilos.botonTexto}>INICIO DE SESIÓN</Text>
-      </Pressable>
-
-      <View style={estilos.enlaces}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Registrarse"
-          onPress={() => setAviso(AVISO_ETAPA)}
-        >
-          <Text style={[estilos.enlace, { color: paleta.verdeLogin }]}>Registrarse</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="¿Ha olvidado su contraseña?"
-          onPress={() => setAviso(AVISO_ETAPA)}
-        >
-          <Text style={[estilos.enlace, { color: paleta.verdeLogin }]}>
-            ¿Ha olvidado su contraseña?
-          </Text>
-        </Pressable>
-      </View>
     </ScrollView>
   );
 }
@@ -165,31 +107,6 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 36,
   },
-  etiqueta: {
-    fontSize: 16,
-  },
-  espacio: {
-    marginTop: 28,
-  },
-  campo: {
-    borderBottomWidth: 1,
-    fontSize: 18,
-    paddingVertical: 10,
-  },
-  filaClave: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-  },
-  clave: {
-    flex: 1,
-    fontSize: 18,
-    paddingVertical: 10,
-  },
-  ojo: {
-    fontSize: 22,
-    paddingHorizontal: 8,
-  },
   aviso: {
     color: '#F2D27A',
     fontSize: 16,
@@ -197,7 +114,7 @@ const estilos = StyleSheet.create({
     marginTop: 16,
   },
   boton: {
-    marginTop: 28,
+    marginTop: 12,
     borderRadius: 8,
     minHeight: 52,
     alignItems: 'center',
@@ -207,15 +124,5 @@ const estilos = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  enlaces: {
-    marginTop: 22,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  enlace: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
