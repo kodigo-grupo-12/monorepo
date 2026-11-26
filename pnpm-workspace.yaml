@@ -2,6 +2,8 @@ packages:
   - "apps/*"
 
 # Estos paquetes traen postinstall que no hacen falta para la app: nunca corren.
+# esbuild si necesita su postinstall: lo trae vitest (T011) y sin su binario no compila.
 allowBuilds:
   "@firebase/util": false
   "protobufjs": false
+  "esbuild": true
