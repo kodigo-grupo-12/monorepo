@@ -44,6 +44,7 @@ export function PantallaInicio() {
   // privacidad. Estado local de sesión, nunca guardado.
   const [montosVisibles, setMontosVisibles] = useState(true);
   const [periodoGrafico, setPeriodoGrafico] = useState<Periodo>('semana');
+  const [periodoGasto, setPeriodoGasto] = useState<Periodo>('mes');
 
   // La papelera marca la transacción; el diálogo decide. Cancelar no toca
   // nada y no hay deshacer (ADR-0012).
@@ -128,6 +129,73 @@ export function PantallaInicio() {
           : total,
       0,
     );
+  // Períodos del gráfico y del Mayor gasto (T010): la semana en curso
+  // (lunes a domingo, 7 barras) y el mes en curso (una barra por día). El
+  // período anterior es el mismo rango corrido atrás, para el porcentaje.
+  const diasDe = (periodo: Periodo, base: Date): string[] => {
+    if (periodo === 'semana') {
+      const desplazamiento = (base.getDay() + 6) % 7;
+      const lunes = new Date(base.getFullYear(), base.getMonth(), base.getDate() - desplazamiento);
+      return Array.from({ length: 7 }, (_, indice) =>
+        aISO(new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + indice)),
+      );
+    }
+    const ultimoDia = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    return Array.from({ length: ultimoDia }, (_, indice) =>
+      aISO(new Date(base.getFullYear(), base.getMonth(), indice + 1)),
+    );
+  };
+  const dias = diasDe(periodoGrafico, new Date());
+  const diasAnteriores = diasDe(
+    periodoGrafico,
+    periodoGrafico === 'semana'
+      ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      : new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1),
+  );
+  const enConjunto = new Set(dias);
+  const enConjuntoAnterior = new Set(diasAnteriores);
+  const gastoEn = (conjunto: Set<string>): number =>
+    transacciones.reduce(
+      (total, transaccion) =>
+        transaccion.tipo === 'gasto' && conjunto.has(transaccion.fecha) ? total + transaccion.monto : total,
+      0,
+    );
+  const gastoActual = gastoEn(enConjunto);
+  const gastoAnterior = gastoEn(enConjuntoAnterior);
+  const gastoPorDia = dias.map((iso) =>
+    transacciones.reduce(
+      (total, transaccion) =>
+        transaccion.tipo === 'gasto' && transaccion.fecha === iso ? total + transaccion.monto : total,
+      0,
+    ),
+  );
+  const topeDia = Math.max(...gastoPorDia, 0);
+  // Sin datos previos el modelo muestra − 0%: mismo tratamiento cuando el
+  // porcentaje da cero.
+  const porcentaje = gastoAnterior > 0 ? Math.round(((gastoActual - gastoAnterior) / gastoAnterior) * 100) : 0;
+  const textoPorcentaje = porcentaje > 0 ? `+ ${porcentaje}%` : `− ${Math.abs(porcentaje)}%`;
+
+  // Mayor gasto: top 3 de categorías por porcentaje del gasto del período.
+  const conjuntoGasto = new Set(diasDe(periodoGasto, new Date()));
+  const gastoPorCategoria = new Map<string, number>();
+  let gastoTotalGasto = 0;
+  for (const transaccion of transacciones) {
+    if (transaccion.tipo !== 'gasto' || !conjuntoGasto.has(transaccion.fecha)) {
+      continue;
+    }
+    const clave = transaccion.categoria_id ?? transaccion.categoria ?? 'Otros gastos';
+    gastoPorCategoria.set(clave, (gastoPorCategoria.get(clave) ?? 0) + transaccion.monto);
+    gastoTotalGasto += transaccion.monto;
+  }
+  const mayorGasto = [...gastoPorCategoria.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([clave, monto]) => ({
+      nombre:
+        (clave.includes('-') ? nombresDeCategoria.get(clave) : undefined) ?? clave,
+      porcentaje: gastoTotalGasto > 0 ? Math.round((monto / gastoTotalGasto) * 100) : 0,
+    }));
+
   const saldoTexto = (monto: number): string =>
     montosVisibles ? `$ ${monto < 0 ? '-' : ''}${Math.abs(monto).toFixed(2)}` : MONTOS_OCULTOS;
 
@@ -196,10 +264,74 @@ export function PantallaInicio() {
           </Pressable>
         </View>
 
-        <ToggleSegmentado valor={periodoGrafico} alCambiar={setPeriodoGrafico} />
-        <Text style={[estilos.vacio, { color: paleta.textoSuave }]}>
-          {cargando ? null : transacciones.length === 0 ? 'Aún no hay transacciones' : null}
-        </Text>
+        <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
+          <ToggleSegmentado valor={periodoGrafico} alCambiar={setPeriodoGrafico} />
+          <Text style={[estilos.graficoTotal, { color: paleta.texto }]}>
+            {montosVisibles ? `$ ${gastoActual.toFixed(2)}` : MONTOS_OCULTOS}
+          </Text>
+          <View style={estilos.graficoFila}>
+            <Text style={[estilos.graficoEtiqueta, { color: paleta.textoSuave }]}>
+              Total gastado {periodoGrafico === 'semana' ? 'esta semana' : 'este mes'}
+            </Text>
+            <Text style={[estilos.graficoPorcentaje, { color: paleta.amarilloCambio }]}>
+              {textoPorcentaje}
+            </Text>
+          </View>
+          {/* Vacío, como en el modelo: barras fantasma y el texto de
+              invitación. Con datos, una barra verde por día. */}
+          {gastoActual === 0 ? (
+            <View style={estilos.graficoVacio}>
+              <View style={estilos.graficoFantasmas}>
+                <View style={[estilos.graficoFantasma, { backgroundColor: paleta.barraFantasma }]} />
+                <View style={[estilos.graficoFantasma, { backgroundColor: paleta.barraFantasma }]} />
+              </View>
+              <Text style={[estilos.graficoVacioTexto, { color: paleta.textoSuave }]}>
+                Introduzca las transacciones para ver el informe
+              </Text>
+            </View>
+          ) : (
+            <View style={estilos.graficoBarras}>
+              {gastoPorDia.map((gasto, indice) => (
+                <View
+                  key={dias[indice]}
+                  style={[
+                    estilos.graficoBarra,
+                    { height: topeDia > 0 ? Math.max(3, (gasto / topeDia) * 72) : 3, backgroundColor: paleta.verdeAccion },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Mayor gasto: top 3 de categorías con glifo y color del mapa fijo
+            de la T007 y porcentaje en rojo. Ver detalles es toast. */}
+        <View style={estilos.seccionCabecera}>
+          <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>Mayor gasto</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ver detalles"
+            onPress={lanzarToast}
+            hitSlop={6}
+          >
+            <Text style={[estilos.enlace, { color: paleta.verdeAccion }]}>Ver detalles</Text>
+          </Pressable>
+        </View>
+
+        <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
+          <ToggleSegmentado valor={periodoGasto} alCambiar={setPeriodoGasto} />
+          {mayorGasto.map((entrada) => (
+            <View key={entrada.nombre} style={estilos.filaGasto}>
+              <GlifoCategoria nombre={entrada.nombre} />
+              <Text style={[estilos.nombreGasto, { color: paleta.texto }]} numberOfLines={1}>
+                {entrada.nombre}
+              </Text>
+              <Text style={[estilos.porcentajeGasto, { color: paleta.rojoMonto }]}>
+                {entrada.porcentaje}%
+              </Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
 
       {toastVisible ? (
@@ -422,10 +554,69 @@ const estilos = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  vacio: {
-    textAlign: 'center',
-    marginTop: 24,
+  graficoTotal: {
+    fontSize: 36,
+    fontWeight: '700',
+    marginTop: 14,
+    fontVariant: ['tabular-nums'],
+  },
+  graficoFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  graficoEtiqueta: {
+    flex: 1,
     fontSize: 15,
+  },
+  graficoPorcentaje: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  graficoVacio: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  graficoFantasmas: {
+    flexDirection: 'row',
+    gap: 26,
+  },
+  graficoFantasma: {
+    width: 100,
+    height: 64,
+    borderRadius: 16,
+  },
+  graficoVacioTexto: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  graficoBarras: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    height: 76,
+    marginTop: 16,
+  },
+  graficoBarra: {
+    flex: 1,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  filaGasto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  nombreGasto: {
+    flex: 1,
+    fontSize: 17,
+    marginLeft: 12,
+  },
+  porcentajeGasto: {
+    fontSize: 17,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   fila: {
     flexDirection: 'row',
