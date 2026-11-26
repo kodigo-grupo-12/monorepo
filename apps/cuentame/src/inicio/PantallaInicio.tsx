@@ -24,6 +24,7 @@ import type { Transaccion } from '../datos/transacciones';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { IconoCartera } from '../carteras/IconoCartera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
+import { aspectoDe } from '../categorias/mapaCategorias';
 import { DIAS_ABREV, MESES, aISO, deISO, hoyISO } from '../transacciones/fechas';
 import { mostrarAviso } from '../avisos/avisos';
 import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
@@ -50,7 +51,6 @@ export function PantallaInicio() {
   // privacidad. Estado local de sesión, nunca guardado.
   const [montosVisibles, setMontosVisibles] = useState(true);
   const [periodoGrafico, setPeriodoGrafico] = useState<Periodo>('semana');
-  const [periodoGasto, setPeriodoGasto] = useState<Periodo>('mes');
 
   // La papelera marca la transacción; el diálogo decide. Cancelar no toca
   // nada y no hay deshacer (ADR-0012).
@@ -217,25 +217,31 @@ export function PantallaInicio() {
     porcentaje > 0 ? `+${porcentaje}%` : porcentaje < 0 ? `−${Math.abs(porcentaje)}%` : '0%';
   const etiquetaDelta = `vs. ${periodoGrafico === 'semana' ? 'semana' : 'mes'} anterior`;
 
-  // Mayor gasto: top 3 de categorías por porcentaje del gasto del período.
-  const conjuntoGasto = new Set(diasDe(periodoGasto, new Date()));
+  // Desglose por categoría (T012, #119): top 5 del mes en curso por gasto,
+  // en orden descendente, con monto, barra y porcentaje del total del mes.
+  // Reemplaza el Mayor gasto de la T010. La clave es el id de categoría (o
+  // el nombre legado de las semillas de la T006) y sirve para filtrar
+  // Transacciones al tocar la fila.
+  const conjuntoMesGasto = new Set(diasDe('mes', new Date()));
   const gastoPorCategoria = new Map<string, number>();
   let gastoTotalGasto = 0;
   for (const transaccion of transacciones) {
-    if (transaccion.tipo !== 'gasto' || !conjuntoGasto.has(transaccion.fecha)) {
+    if (transaccion.tipo !== 'gasto' || !conjuntoMesGasto.has(transaccion.fecha)) {
       continue;
     }
     const clave = transaccion.categoria_id ?? transaccion.categoria ?? 'Otros gastos';
     gastoPorCategoria.set(clave, (gastoPorCategoria.get(clave) ?? 0) + transaccion.monto);
     gastoTotalGasto += transaccion.monto;
   }
-  const mayorGasto = [...gastoPorCategoria.entries()]
+  const desglose = [...gastoPorCategoria.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
+    .slice(0, 5)
     .map(([clave, monto]) => ({
+      clave,
       // El lookup va primero sin importar la forma de la clave: los ids de
       // Firestore no llevan guiones y resuelven igual en el mapa.
       nombre: nombresDeCategoria.get(clave) ?? clave,
+      monto,
       porcentaje: gastoTotalGasto > 0 ? Math.round((monto / gastoTotalGasto) * 100) : 0,
     }));
 
@@ -431,10 +437,12 @@ export function PantallaInicio() {
           )}
         </View>
 
-        {/* Mayor gasto: top 3 de categorías con glifo y color del mapa fijo
-            de la T007 y porcentaje en rojo. Ver detalles es toast. */}
+        {/* Desglose por categoría (T012, #119): top 5 del mes con glifo y
+            color del mapa fijo de la T007, monto, barra y porcentaje. Tocar
+            una categoría abre Transacciones filtrada por ella; Ver detalles
+            sigue siendo toast (T005). El ojito oculta los montos. */}
         <View style={estilos.seccionCabecera}>
-          <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>Mayor gasto</Text>
+          <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>Desglose por categoría</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Ver detalles"
@@ -446,17 +454,37 @@ export function PantallaInicio() {
         </View>
 
         <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
-          <ToggleSegmentado valor={periodoGasto} alCambiar={setPeriodoGasto} />
-          {mayorGasto.map((entrada) => (
-            <View key={entrada.nombre} style={estilos.filaGasto}>
-              <GlifoCategoria nombre={entrada.nombre} />
-              <Text style={[estilos.nombreGasto, { color: paleta.texto }]} numberOfLines={1}>
-                {entrada.nombre}
-              </Text>
-              <Text style={[estilos.porcentajeGasto, { color: paleta.rojoMonto }]}>
-                {entrada.porcentaje}%
-              </Text>
-            </View>
+          {desglose.map((entrada) => (
+            <Pressable
+              key={entrada.clave}
+              accessibilityRole="button"
+              accessibilityLabel={`Transacciones de ${entrada.nombre}`}
+              onPress={() => enrutador.push(`/transacciones?categoria=${encodeURIComponent(entrada.clave)}`)}
+            >
+              <View style={estilos.filaGasto}>
+                <GlifoCategoria nombre={entrada.nombre} />
+                <Text style={[estilos.nombreGasto, { color: paleta.texto }]} numberOfLines={1}>
+                  {entrada.nombre}
+                </Text>
+                <Text style={[estilos.montoGasto, { color: paleta.texto }]}>
+                  {saldoTexto(entrada.monto)}
+                </Text>
+                <Text style={[estilos.porcentajeGasto, { color: paleta.textoSuave }]}>
+                  {entrada.porcentaje}%
+                </Text>
+              </View>
+              <View style={estilos.barraGastoPista}>
+                <View
+                  style={[
+                    estilos.barraGasto,
+                    {
+                      width: `${Math.min(100, entrada.porcentaje)}%`,
+                      backgroundColor: aspectoDe(entrada.nombre).color,
+                    },
+                  ]}
+                />
+              </View>
+            </Pressable>
           ))}
         </View>
         {/* Transacciones recientes: las últimas 5 con FilaReciente; el
@@ -1000,10 +1028,27 @@ const estilos = StyleSheet.create({
     fontSize: 17,
     marginLeft: 12,
   },
+  montoGasto: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    marginLeft: 8,
+  },
   porcentajeGasto: {
     fontSize: 17,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
+  },
+  barraGastoPista: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: paleta.barraFantasma,
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  barraGasto: {
+    height: 4,
+    borderRadius: 2,
   },
   filaReciente: {
     flexDirection: 'row',
