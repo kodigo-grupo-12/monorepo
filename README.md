@@ -1,48 +1,81 @@
-# Monorepo
+<h3 align="center">
+	<img src="https://raw.githubusercontent.com/kodigo-grupo-12/.github/main/Assets/cuentame-web-512.png" width="100" alt="Ícono de Cuéntame"/><br/>
+	Cuéntame
+	<img src="https://raw.githubusercontent.com/catppuccin/catppuccin/main/assets/misc/transparent.png" height="30" width="0px"/>
+</h3>
 
-Repositorio de la aplicación del Grupo 12. Una app Expo, para Android y para la web.
+<p align="center">
+	App de finanzas personales del Grupo 12. Expo, para Android y para la web.
+</p>
 
-En esta etapa la aplicación se llama Cuéntame. El nombre puede cambiar.
+<p align="center">
+	<a href="https://expo.dev/"><img src="https://img.shields.io/static/v1?style=for-the-badge&message=Expo+SDK+58&colorA=363a4f&colorB=cba6f7&logoColor=d9e0ee"/></a>
+	<img src="https://img.shields.io/static/v1?style=for-the-badge&message=Node+22.13%2B&colorA=363a4f&colorB=a6da95&logoColor=d9e0ee"/>
+	<img src="https://img.shields.io/static/v1?style=for-the-badge&message=pnpm+12&colorA=363a4f&colorB=fab387&logoColor=d9e0ee"/>
+	<a href="https://firebase.google.com/products/firestore"><img src="https://img.shields.io/static/v1?style=for-the-badge&message=Firestore&colorA=363a4f&colorB=f9e2af&logoColor=d9e0ee"/></a>
+</p>
 
-- Código: https://github.com/kodigo-grupo-12/monorepo
-- Documentación: https://github.com/kodigo-grupo-12/documentacion
-- Sitio: https://kodigo-grupo-12.github.io/documentacion/
+<p align="center">
+	<a href="https://github.com/kodigo-grupo-12/documentacion">Documentación</a> ·
+	<a href="https://kodigo-grupo-12.github.io/documentacion/">Sitio</a> ·
+	<a href="https://github.com/kodigo-grupo-12/monorepo/issues">Issues</a>
+</p>
 
-## Validación rápida
+## Empezar
 
-Hace falta Node 22.13 o más. En la raíz del repo, primero:
+Hace falta [mise](https://mise.jdx.dev/), `make` y un teléfono o navegador.
 
 ```bash
-pnpm install
+git clone https://github.com/kodigo-grupo-12/monorepo.git
+cd monorepo
+mise use node@22.13.0 pnpm@12.15.0   # fija las versiones del repo
+make doctor                          # audita el entorno
+make install                         # instala dependencias (pnpm)
+make dev                             # servidor de Expo
 ```
 
-Ese comando instala el único paquete, `cuentame`. Después, en una terminal:
+`make dev` no termina: levanta un solo servidor. Sin sesión, el navegador muestra el splash y después el carrusel; con sesión, el inicio. El teléfono abre esa misma pantalla: misma red y Expo Go del SDK 58. Si hay Tailscale o Docker de por medio, usa `make dev-lan`, que anuncia la IP real de la LAN. No se usa la carpeta nativa de Android y no se genera un APK.
+
+En otra terminal, mientras `make dev` sigue corriendo:
 
 ```bash
-pnpm start
+make typecheck   # chequeo de tipos
 ```
 
-`pnpm start` no termina: levanta un solo servidor. Sin sesión, el navegador muestra el splash y después el carrusel. Con sesión, el splash deja ver el inicio. El teléfono abre esa misma pantalla. En otra terminal:
+## Comandos
+
+| Comando | Qué hace |
+| --- | --- |
+| `make doctor` | audita Node, pnpm, Java, Android SDK y puertos |
+| `make install` | instala las dependencias del monorepo |
+| `make dev` | servidor de Expo en el primer puerto libre |
+| `make dev-lan` | Expo anuncia la IP de la LAN (para Expo Go) |
+| `make web` | servidor apuntado al navegador |
+| `make typecheck` | chequeo de TypeScript |
+| `make verify` | verificación completa local |
+| `make stop` | detiene servidores Metro o Expo colgados |
+
+Para Android en dispositivo o emulador, `make` también trae `emulator`, `devices`, `reverse`, `logcat` y `apk-install APK=ruta`. Lint, tests automáticos y build formal quedan fuera de esta etapa.
+
+## Firebase
+
+La app lee y escribe transacciones en Firestore del proyecto **kodigo-grupo12**, en modo prueba.
 
 ```bash
-pnpm typecheck
+cp apps/cuentame/.env.example apps/cuentame/.env
 ```
 
-`pnpm typecheck` es el chequeo automático.
+Llena los cinco valores desde Firebase console > Configuración del proyecto > General > Configuración web. El `.env` está en `.gitignore` y no se sube.
 
-El teléfono tiene que estar en la misma red y usar Expo Go del SDK 58. No se usa la carpeta nativa de Android y no se genera un APK.
+- La sincronización entre dispositivos es en tiempo real: el teléfono y el navegador ven lo mismo.
+- Para el MVP con Expo Go no hace falta `google-services.json`; solo se necesita en builds nativas.
+- La app arranca con la cuenta demo.
 
-Lint, los tests automáticos y el build formal quedan fuera de esta tarea.
+## Estructura
 
-## Ilustraciones del carrusel
-
-Las seis ilustraciones de `apps/cuentame/assets/carrusel/` son copias. Se reponen desde la carpeta de assets del carrusel de la TAREA 003:
-
-- `01-finanzas-simple.png`
-- `02-gastos-por-mes.png`
-- `03-balance-todo.png`
-- `04-metas-ahorro.png`
-- `05-agente.png`
-- `06-privacidad.png`
-
-La pantalla no las pide por URL. El modelo y la plantilla de login no se muestran.
+```
+apps/cuentame   la app (Expo, TypeScript)
+make/           recetas del Makefile (doctor, dev, mobile, quality)
+docs/           ADRs y guías para agentes
+GLOSSARY.md     glosario del dominio
+```
