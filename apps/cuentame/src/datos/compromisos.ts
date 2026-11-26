@@ -1,6 +1,25 @@
-// Tipos del compromiso de «Deudas y préstamos» (spec #130, issue #131).
+// Tipos y escrituras del compromiso de «Deudas y préstamos» (spec #130).
 // Nada de lo que es suma se guarda: lo abonado, lo pendiente y el estado se
 // calculan en compromisos/calculos.ts (ADR-0019).
+import { collection } from 'firebase/firestore';
+
+import { armarBatchCompromiso, COLECCION_COMPROMISOS, type DatosNuevoCompromiso } from './consultas';
+import { db } from './firebase';
+import { uidDeSesion } from '../sesion/auth';
+
+export const coleccionCompromisos = collection(db, COLECCION_COMPROMISOS);
+
+// Crea el compromiso y, si viene origen y la naturaleza es dinero, la
+// transacción de origen amarrada, todo en un solo batch (#132).
+export async function crearCompromiso(
+  datos: DatosNuevoCompromiso,
+  origen?: { cartera_id: string },
+): Promise<string> {
+  const { batch, id } = armarBatchCompromiso(db, datos, uidDeSesion(), origen);
+  await batch.commit();
+  return id;
+}
+
 export type Direccion = 'me_deben' | 'debo';
 export type Naturaleza = 'dinero' | 'compra';
 export type Cierre = 'perdonado' | 'cancelado';

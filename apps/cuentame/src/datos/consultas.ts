@@ -1,12 +1,16 @@
 import type { Compromiso } from './compromisos';
+import { notaDeOrigen } from '../compromisos/calculos';
 import {
   collection,
+  doc,
   orderBy,
   query,
   where,
+  writeBatch,
   type DocumentData,
   type Firestore,
   type Query,
+  type WriteBatch,
 } from 'firebase/firestore';
 
 export const COLECCION_TRANSACCIONES = 'transacciones';
@@ -117,6 +121,39 @@ export function consultaTransaccionesPorDuenio(db: Firestore, uid: string): Quer
     where('uid', '==', uid),
     orderBy('fecha', 'desc'),
   );
+}
+
+// Arma el batch del compromiso nuevo y, si la plata salió o entró de una
+// cartera (solo naturaleza 'dinero'), la transacción de origen amarrada en
+// el mismo batch. No hace commit: quien llama decide cuándo (#132).
+export function armarBatchCompromiso(
+  db: Firestore,
+  datos: DatosNuevoCompromiso,
+  uid: string,
+  origen?: { cartera_id: string },
+): { batch: WriteBatch; id: string } {
+  const batch = writeBatch(db);
+  const referencia = doc(collection(db, COLECCION_COMPROMISOS));
+  batch.set(referencia, documentoNuevoCompromiso(datos, uid));
+  if (origen && datos.naturaleza === 'dinero') {
+    batch.set(
+      doc(collection(db, COLECCION_TRANSACCIONES)),
+      documentoNuevaTransaccion(
+        {
+          tipo: datos.direccion === 'me_deben' ? 'gasto' : 'ingreso',
+          monto: datos.monto,
+          fecha: datos.fecha,
+          cartera_id: origen.cartera_id,
+          compromiso_id: referencia.id,
+          rol: 'origen',
+          neutral: true,
+          nota: notaDeOrigen({ direccion: datos.direccion, contraparte: datos.contraparte.trim() }),
+        },
+        uid,
+      ),
+    );
+  }
+  return { batch, id: referencia.id };
 }
 
 // Sin orderBy a propósito: el orden se hace en el aparato y así no hace

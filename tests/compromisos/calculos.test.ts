@@ -5,6 +5,8 @@ import {
   abonosDe,
   diasDeAtraso,
   esMovimientoReal,
+  notaDeAbono,
+  notaDeOrigen,
   estaAbierto,
   estadoDe,
   pendienteDe,
@@ -130,5 +132,14 @@ describe('resumenCompromisos', () => {
     expect(resumen.meDeben).toBeCloseTo(40, 2);
     expect(resumen.debo).toBeCloseTo(30, 2);
     expect(resumen.vencidos).toBe(1);
+  });
+});
+
+describe('notas de origen y abono', () => {
+  it('da las cuatro frases exactas', () => {
+    expect(notaDeOrigen({ direccion: 'me_deben', contraparte: 'Juan' })).toBe('Préstamo a Juan');
+    expect(notaDeOrigen({ direccion: 'debo', contraparte: 'Ana' })).toBe('Préstamo de Ana');
+    expect(notaDeAbono({ direccion: 'me_deben', contraparte: 'Juan' })).toBe('Cobro de Juan');
+    expect(notaDeAbono({ direccion: 'debo', contraparte: 'Ana' })).toBe('Pago a Ana');
   });
 });

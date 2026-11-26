@@ -26,6 +26,9 @@ import { actualizarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { mostrarAviso } from '../avisos/avisos';
+import { crearCompromiso } from '../datos/compromisos';
+import type { Direccion, Naturaleza } from '../datos/compromisos';
+import { contraparteValida, normalizarTelefono } from '../compromisos/contraparte';
 
 const TOPE_B64 = 700 * 1024;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -60,6 +63,16 @@ async function comprimirFoto(uri: string): Promise<string | undefined> {
   return undefined;
 }
 
+// La misma normalización del ticket, pero para el render: un teléfono a
+// medio escribir no debe tumbar la pantalla.
+function seguroTelefono(texto: string): string | undefined {
+  try {
+    return normalizarTelefono(texto);
+  } catch {
+    return undefined;
+  }
+}
+
 type PropsModal = { visible: boolean; alCerrar: () => void; transaccion?: Transaccion };
 
 type Vista = 'form' | 'categoria' | 'cartera';
@@ -87,9 +100,27 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
   const [creandoAlta, setCreandoAlta] = useState(false);
   const [carteraId, setCarteraId] = useState<string>();
   const [nuevaCartera, setNuevaCartera] = useState('');
+  const [segmento, setSegmento] = useState<'gasto' | 'ingreso' | 'compromiso'>('gasto');
+  const [direccion, setDireccion] = useState<Direccion>('me_deben');
+  const [naturaleza, setNaturaleza] = useState<Naturaleza>('dinero');
+  const [contraparteTexto, setContraparteTexto] = useState('');
+  const [telefonoTexto, setTelefonoTexto] = useState('');
+  const [venceFecha, setVenceFecha] = useState<Date>();
+  const [conOrigen, setConOrigen] = useState(true);
 
   const { categorias } = useCategorias();
-  const delTipo = categorias.filter((categoria) => categoria.tipo === tipo);
+  // En «Deuda/Préstamo» la lista de categorías sale de la naturaleza: una
+  // compra con debo lista las de gasto y con me_deben las de ingreso; con
+  // dinero no hay categoría.
+  const tipoEfectivo: TipoTransaccion | undefined =
+    segmento === 'compromiso'
+      ? naturaleza === 'compra'
+        ? direccion === 'debo'
+          ? 'gasto'
+          : 'ingreso'
+        : undefined
+      : tipo;
+  const delTipo = categorias.filter((categoria) => categoria.tipo === tipoEfectivo);
   const categoriaSeleccionada = categorias.find((categoria) => categoria.id === categoriaId);
   const { carteras } = useCarteras();
   const carteraSeleccionada = carteras.find((cartera) => cartera.id === carteraId);
@@ -125,6 +156,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
     setNuevaCategoria('');
     setCarteraId(undefined);
     setNuevaCartera('');
+    setSegmento('gasto');
+    setDireccion('me_deben');
+    setNaturaleza('dinero');
+    setContraparteTexto('');
+    setTelefonoTexto('');
+    setVenceFecha(undefined);
+    setConOrigen(true);
   }, [visible, transaccion]);
 
   // Monto: solo dígitos y un punto con hasta dos decimales.
@@ -146,6 +184,14 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
   }
 
   const montoValido = /^\d+(\.\d{1,2})?$/.test(montoTexto) && Number(montoTexto) > 0;
+  const telefonoSeguro = telefonoTexto.trim() ? seguroTelefono(telefonoTexto) : undefined;
+  const telefonoInvalido = !!telefonoTexto.trim() && telefonoSeguro === undefined;
+  const compromisoValido =
+    montoValido &&
+    contraparteValida(contraparteTexto) &&
+    !telefonoInvalido &&
+    (naturaleza === 'dinero' ? !conOrigen || !!carteraId : !!categoriaId);
+  const listo = segmento === 'compromiso' ? compromisoValido : montoValido && !!categoriaId && !!carteraId;
 
   async function elegirFoto() {
     const resultado = await SelectorImagen.launchImageLibraryAsync({
@@ -171,7 +217,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
     }
     setCreandoAlta(true);
     try {
-      const id = await crearCategoria(nombre, tipo);
+      const id = await crearCategoria(nombre, tipoEfectivo ?? tipo);
       setCategoriaId(id);
       setNuevaCategoria('');
       setVista('form');
@@ -198,6 +244,42 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
   }
 
   async function guardar() {
+    if (segmento === 'compromiso') {
+      if (!listo || guardando) {
+        return;
+      }
+      setGuardando(true);
+      try {
+        await crearCompromiso(
+          {
+            direccion,
+            naturaleza,
+            contraparte: contraparteTexto,
+            telefono: telefonoSeguro,
+            monto: Number(montoTexto),
+            fecha: fechaISO(fecha),
+            vence: venceFecha ? fechaISO(venceFecha) : undefined,
+            categoria_id: naturaleza === 'compra' ? categoriaId : undefined,
+            nota: notaTexto.trim() ? notaTexto.trim() : undefined,
+          },
+          naturaleza === 'dinero' && conOrigen && carteraId ? { cartera_id: carteraId } : undefined,
+        );
+        mostrarAviso({
+          mensaje:
+            direccion === 'me_deben'
+              ? `Préstamo a ${contraparteTexto.trim()} guardado`
+              : `Deuda con ${contraparteTexto.trim()} guardado`,
+          tipo: 'exito',
+        });
+        alCerrar();
+      } catch (error) {
+        console.error('No se pudo crear el compromiso:', error);
+        mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
+      } finally {
+        setGuardando(false);
+      }
+      return;
+    }
     if (!montoValido || !categoriaId || !carteraId || guardando) {
       return;
     }
@@ -404,27 +486,39 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
         ) : (
           <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
             <View style={estilos.selector}>
-              {(['gasto', 'ingreso'] as const).map((valor) => (
+              {(enEdicion
+                ? (['gasto', 'ingreso'] as const)
+                : (['gasto', 'ingreso', 'compromiso'] as const)
+              ).map((valor) => (
                 <Pressable
                   key={valor}
-                  style={[estilos.segmento, tipo === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
+                  style={[estilos.segmento, segmento === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: tipo === valor }}
-                  onPress={() => alCambiarTipo(valor)}
+                  accessibilityState={{ selected: segmento === valor }}
+                  onPress={() => {
+                    if (valor === 'compromiso') {
+                      setSegmento('compromiso');
+                      return;
+                    }
+                    alCambiarTipo(valor);
+                    setSegmento(valor);
+                  }}
                 >
                   <Text
                     style={[
                       estilos.segmentoTexto,
-                      { color: tipo === valor ? paleta.texto : paleta.textoSuave },
-                      tipo === valor && { fontWeight: 'bold' },
+                      { color: segmento === valor ? paleta.texto : paleta.textoSuave },
+                      segmento === valor && { fontWeight: 'bold' },
                     ]}
                   >
-                    {valor === 'gasto' ? 'Gasto' : 'Ingreso'}
+                    {valor === 'gasto' ? 'Gasto' : valor === 'ingreso' ? 'Ingreso' : 'Deuda/Préstamo'}
                   </Text>
                 </Pressable>
               ))}
             </View>
 
+{segmento !== 'compromiso' ? (
+            <>
             <Pressable
               style={estilos.fila}
               accessibilityRole="button"
@@ -553,7 +647,256 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
               </Pressable>
             </View>
 
+</>
+            ) : (
+            <>
+            <View style={estilos.selector}>
+              {(['me_deben', 'debo'] as const).map((valor) => (
+                <Pressable
+                  key={valor}
+                  style={[estilos.segmento, direccion === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: direccion === valor }}
+                  onPress={() => setDireccion(valor)}
+                >
+                  <Text
+                    style={[
+                      estilos.segmentoTexto,
+                      { color: direccion === valor ? paleta.texto : paleta.textoSuave },
+                      direccion === valor && { fontWeight: 'bold' },
+                    ]}
+                  >
+                    {valor === 'me_deben' ? 'Me deben' : 'Debo'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={estilos.selector}>
+              {(['dinero', 'compra'] as const).map((valor) => (
+                <Pressable
+                  key={valor}
+                  style={[estilos.segmento, naturaleza === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: naturaleza === valor }}
+                  onPress={() => {
+                    if (valor !== naturaleza) {
+                      setCategoriaId(undefined);
+                    }
+                    setNaturaleza(valor);
+                  }}
+                >
+                  <Text
+                    style={[
+                      estilos.segmentoTexto,
+                      { color: naturaleza === valor ? paleta.texto : paleta.textoSuave },
+                      naturaleza === valor && { fontWeight: 'bold' },
+                    ]}
+                  >
+                    {valor === 'dinero' ? 'Dinero' : 'Compra'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={[estilos.ayuda, { color: paleta.textoSuave }]}>
+              Dinero: se movió plata. Compra: te llevaste algo y lo pagás después.
+            </Text>
+
+            <TextInput
+              style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+              value={contraparteTexto}
+              onChangeText={setContraparteTexto}
+              placeholder="¿Quién? (ej. Juan)"
+              placeholderTextColor={paleta.textoSuave}
+              accessibilityLabel="Contraparte"
+            />
+
+            <TextInput
+              style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+              value={telefonoTexto}
+              onChangeText={setTelefonoTexto}
+              keyboardType="number-pad"
+              placeholder="Teléfono (opcional, para recordarle)"
+              placeholderTextColor={paleta.textoSuave}
+              accessibilityLabel="Teléfono"
+            />
+            {telefonoInvalido ? (
+              <Text style={[estilos.errorTexto, { color: paleta.rojo }]}>Teléfono inválido</Text>
+            ) : null}
+
+            <View style={estilos.monto}>
+              <View style={estilos.badge}>
+                <Text style={[estilos.badgeTexto, { color: paleta.texto }]}>USD</Text>
+              </View>
+              <TextInput
+                style={[estilos.montoEntrada, { color: paleta.verdeMonto }]}
+                value={montoTexto}
+                onChangeText={alCambiarMonto}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                placeholderTextColor={paleta.textoSuave}
+                accessibilityLabel="Monto"
+              />
+            </View>
+
+            <View style={estilos.fila}>
+              <View style={estilos.calendario}>
+                <View style={estilos.calendarioPinIzquierdo} />
+                <View style={estilos.calendarioPinDerecho} />
+                <View style={estilos.calendarioLinea} />
+              </View>
+              <Pressable
+                style={estilos.flecha}
+                accessibilityRole="button"
+                accessibilityLabel="Día anterior"
+                onPress={() => setFecha(new Date(fecha.getTime() - 86400000))}
+              >
+                <View style={estilos.flechaIzquierda} />
+              </Pressable>
+              <View style={[estilos.pastilla, { backgroundColor: paleta.verdeOscuro }]}>
+                <Text style={[estilos.pastillaTexto, { color: paleta.texto }]}>{fechaTexto(fecha)}</Text>
+              </View>
+              <Pressable
+                style={estilos.flecha}
+                accessibilityRole="button"
+                accessibilityLabel="Día siguiente"
+                onPress={() => setFecha(new Date(fecha.getTime() + 86400000))}
+              >
+                <View style={estilos.flechaDerecha} />
+              </Pressable>
+            </View>
+
+            <View style={estilos.fila}>
+              <View style={estilos.calendario}>
+                <View style={estilos.calendarioPinIzquierdo} />
+                <View style={estilos.calendarioPinDerecho} />
+                <View style={estilos.calendarioLinea} />
+              </View>
+              {venceFecha ? (
+                <>
+                  <Pressable
+                    style={estilos.flecha}
+                    accessibilityRole="button"
+                    accessibilityLabel="Día anterior del vencimiento"
+                    onPress={() => setVenceFecha(new Date(venceFecha.getTime() - 86400000))}
+                  >
+                    <View style={estilos.flechaIzquierda} />
+                  </Pressable>
+                  <View style={[estilos.pastilla, { backgroundColor: paleta.superficie }]}>
+                    <Text style={[estilos.pastillaTexto, { color: paleta.texto }]}>Vence {fechaTexto(venceFecha)}</Text>
+                  </View>
+                  <Pressable
+                    style={estilos.flecha}
+                    accessibilityRole="button"
+                    accessibilityLabel="Quitar vencimiento"
+                    onPress={() => setVenceFecha(undefined)}
+                  >
+                    <View style={[estilos.flechaIzquierda, { transform: [{ rotate: '135deg' }] }]} />
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  style={[estilos.pastilla, { backgroundColor: paleta.superficie }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Elegir fecha de vencimiento"
+                  onPress={() => setVenceFecha(new Date())}
+                >
+                  <Text style={[estilos.pastillaTexto, { color: paleta.textoSuave }]}>Sin fecha</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {naturaleza === 'dinero' ? (
+              <>
+                <Pressable
+                  style={estilos.filaAccion}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: conOrigen }}
+                  accessibilityLabel={direccion === 'me_deben' ? 'Salió de mi cartera' : 'Entró a mi cartera'}
+                  onPress={() => setConOrigen((antes) => !antes)}
+                >
+                  <View
+                    style={[
+                      estilos.casilla,
+                      { borderColor: paleta.separador },
+                      conOrigen && { backgroundColor: paleta.verdeLogin, borderColor: paleta.verdeLogin },
+                    ]}
+                  >
+                    {conOrigen ? <View style={estilos.casillaPalomita} /> : null}
+                  </View>
+                  <Text style={[estilos.filaTexto, { color: paleta.texto, flex: 1 }]}>
+                    {direccion === 'me_deben' ? 'Salió de mi cartera' : 'Entró a mi cartera'}
+                  </Text>
+                </Pressable>
+                {conOrigen ? (
+                  <Pressable
+                    style={estilos.fila}
+                    accessibilityRole="button"
+                    accessibilityLabel={carteraSeleccionada ? carteraSeleccionada.nombre : 'Seleccione cartera'}
+                    onPress={() => setVista('cartera')}
+                  >
+                    {carteraSeleccionada ? (
+                      <IconoCartera />
+                    ) : (
+                      <View style={estilos.billetera}>
+                        <View style={estilos.billeteraMoneda} />
+                      </View>
+                    )}
+                    <Text
+                      style={[
+                        estilos.filaTexto,
+                        { color: carteraSeleccionada ? paleta.texto : paleta.textoSuave, flex: 1 },
+                      ]}
+                    >
+                      {carteraSeleccionada ? carteraSeleccionada.nombre : 'Seleccione cartera'}
+                    </Text>
+                    <View style={estilos.chevron} />
+                  </Pressable>
+                ) : null}
+              </>
+            ) : (
+              <Pressable
+                style={estilos.fila}
+                accessibilityRole="button"
+                accessibilityLabel={categoriaSeleccionada ? categoriaSeleccionada.nombre : 'Seleccione categoría'}
+                onPress={() => setVista('categoria')}
+              >
+                {categoriaSeleccionada ? (
+                  <GlifoCategoria nombre={categoriaSeleccionada.nombre} />
+                ) : (
+                  <View style={estilos.circuloCategoria} />
+                )}
+                <Text
+                  style={[
+                    estilos.filaTexto,
+                    { color: categoriaSeleccionada ? paleta.texto : paleta.textoSuave, flex: 1 },
+                  ]}
+                >
+                  {categoriaSeleccionada ? categoriaSeleccionada.nombre : 'Seleccione categoría'}
+                </Text>
+                <View style={estilos.chevron} />
+              </Pressable>
+            )}
+
+            <View style={estilos.fila}>
+              <View style={estilos.notas}>
+                <View style={estilos.notaLinea} />
+                <View style={estilos.notaLinea} />
+              </View>
+              <TextInput
+                style={[estilos.notaEntrada, { color: paleta.texto }]}
+                value={notaTexto}
+                onChangeText={setNotaTexto}
+                placeholder="Escribir una nota"
+                placeholderTextColor={paleta.textoSuave}
+                accessibilityLabel="Nota"
+              />
+            </View>
+
             <View style={estilos.espacio} />
+            </>
+            )}
+
           </ScrollView>
         )}
 
@@ -561,19 +904,19 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
           <Pressable
             style={[
               estilos.guardar,
-              montoValido && categoriaId && carteraId ? { backgroundColor: paleta.verdeLogin } : { backgroundColor: paleta.superficie },
+              listo ? { backgroundColor: paleta.verdeLogin } : { backgroundColor: paleta.superficie },
               { marginBottom: 24 + margenes.bottom },
             ]}
             accessibilityRole="button"
             accessibilityLabel="Guardar"
-            accessibilityState={{ disabled: !montoValido || !categoriaId || !carteraId || guardando }}
-            disabled={!montoValido || !categoriaId || !carteraId || guardando}
+            accessibilityState={{ disabled: !listo || guardando }}
+            disabled={!listo || guardando}
             onPress={guardar}
           >
             <Text
               style={[
                 estilos.guardarTexto,
-                { color: montoValido && categoriaId && carteraId ? paleta.texto : paleta.textoSuave },
+                { color: listo ? paleta.texto : paleta.textoSuave },
               ]}
             >
               Guardar
@@ -901,6 +1244,44 @@ const estilos = StyleSheet.create({
   quitarTexto: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  entrada: {
+    borderWidth: 1,
+    borderRadius: 12,
+    height: 48,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  ayuda: {
+    fontSize: 12,
+    marginTop: -6,
+    marginBottom: 12,
+  },
+  errorTexto: {
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  filaAccion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  casilla: {
+    width: 22,
+    height: 22,
+    borderWidth: 1.5,
+    borderRadius: 6,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  casillaPalomita: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: paleta.texto,
   },
   espacio: {
     height: 16,

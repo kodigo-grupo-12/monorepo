@@ -5,6 +5,18 @@
 import type { Compromiso } from '../datos/compromisos';
 import type { Transaccion } from '../datos/transacciones';
 
+export function notaDeOrigen(compromiso: Pick<Compromiso, 'direccion' | 'contraparte'>): string {
+  return compromiso.direccion === 'me_deben'
+    ? `Préstamo a ${compromiso.contraparte}`
+    : `Préstamo de ${compromiso.contraparte}`;
+}
+
+export function notaDeAbono(compromiso: Pick<Compromiso, 'direccion' | 'contraparte'>): string {
+  return compromiso.direccion === 'me_deben'
+    ? `Cobro de ${compromiso.contraparte}`
+    : `Pago a ${compromiso.contraparte}`;
+}
+
 export type EstadoCompromiso = 'activo' | 'vencido' | 'cerrado' | 'perdonado' | 'cancelado';
 
 const enCentavos = (monto: number): number => Math.round(monto * 100);
