@@ -51,6 +51,11 @@ const TOPES_GASTO: Record<string, [number, number]> = {
 // fecha mientras su día llegue al tope.
 const TOPE_DIA = 40000;
 
+// La cartera de efectivo solo carga compras pequeñas de contado: un gasto
+// mayor a $60.00 ya no es de efectivo y va a Banco o Tarjeta (hallazgo del
+// recorrido del PR #148, donde Efectivo terminó en -$2,588.42).
+const TOPE_EFECTIVO = 6000;
+
 // Los 3 movimientos del día pico (Comida y bebida, hace 3 meses, día 15,
 // todos en Tarjeta): PriceSmart 512.90 + Campero 21.40 + pupusas 7.45
 // = 541.75, para que las preguntas de la demo tengan respuesta clara.
@@ -204,7 +209,9 @@ export function generarHistorialEjemplo({
     const diasDelMes = fechas.filter((fecha) => fecha.slice(0, 7) === mes);
     const fecha = diasDelMes[numeroEntre(siguiente, 0, diasDelMes.length - 1)];
     const categoria = idDe(otrosNombres[numeroEntre(siguiente, 0, otrosNombres.length - 1)]);
-    const carteraId = siguiente() < 0.5 ? `banco-${uid}` : `efectivo-${uid}`;
+    // Dos de cada tres van a Efectivo: es casi su única entrada de dinero
+    // (el salario llega a Banco). El saldo de efectivo sale del cierre.
+    const carteraId = siguiente() < 2 / 3 ? `efectivo-${uid}` : `banco-${uid}`;
     agregada('ingreso', numeroEntre(siguiente, 1500, 25000), fecha, categoria, carteraId);
   }
 
@@ -228,12 +235,57 @@ export function generarHistorialEjemplo({
     const monto = numeroEntre(siguiente, minimo, maximo);
     const fecha = elegirFecha(monto);
     sumaPorDia.set(fecha, (sumaPorDia.get(fecha) ?? 0) + monto);
-    const carteraId = `${['efectivo', 'banco', 'tarjeta'][numeroEntre(siguiente, 0, 2)]}-${uid}`;
+    // Gasto pequeño puede caer en Efectivo; grande solo en Banco o Tarjeta.
+    const tiro = siguiente();
+    const carteraId =
+      monto <= TOPE_EFECTIVO
+        ? tiro < 1 / 3
+          ? `efectivo-${uid}`
+          : tiro < 2 / 3
+            ? `banco-${uid}`
+            : `tarjeta-${uid}`
+        : tiro < 0.5
+          ? `banco-${uid}`
+          : `tarjeta-${uid}`;
     agregada('gasto', monto, fecha, categoria, carteraId);
   }
   for (const [nota, monto] of DIA_PICO) {
     agregada('gasto', monto, pico, idDe('Comida y bebida'), `tarjeta-${uid}`, nota);
     sumaPorDia.set(pico, (sumaPorDia.get(pico) ?? 0) + monto);
+  }
+
+  // Cierre del hallazgo del PR #148: la cartera de efectivo no queda en
+  // negativo. Si el azar de un uid la deja en rojo, se mueven sus gastos
+  // mayores a Banco (pagos con débito), siempre el mayor primero: el
+  // generador sigue determinista.
+  const enCentavos = (monto: number) => Math.round(monto * 100);
+  const saldoEfectivo = transacciones.reduce(
+    (saldo, transaccion) =>
+      transaccion.cartera_id === `efectivo-${uid}`
+        ? saldo +
+          (transaccion.tipo === 'ingreso'
+            ? enCentavos(transaccion.monto)
+            : -enCentavos(transaccion.monto))
+        : saldo,
+    0,
+  );
+  let saldo = saldoEfectivo;
+  while (saldo < 0) {
+    let mayor: SemillaTransaccion | undefined;
+    for (const transaccion of transacciones) {
+      if (
+        transaccion.cartera_id === `efectivo-${uid}` &&
+        transaccion.tipo === 'gasto' &&
+        (!mayor || transaccion.monto > mayor.monto)
+      ) {
+        mayor = transaccion;
+      }
+    }
+    if (!mayor) {
+      break;
+    }
+    mayor.cartera_id = `banco-${uid}`;
+    saldo += enCentavos(mayor.monto);
   }
 
   return { carteras, transacciones };
