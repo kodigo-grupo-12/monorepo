@@ -15,6 +15,7 @@ export const paleta = {
   teal: '#26A69A',
   globoTotal: '#00897B',
   naranjaCartera: '#FF9800',
+  tarjeta: '#2C2C2E',
   rojo: '#E53935',
   azulMonto: '#4FC3F7',
   rojoMonto: '#FF453A',
