@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,9 +7,12 @@ import { Esqueleto } from '../animaciones/Esqueleto';
 import { useCarteras } from '../datos/useCarteras';
 import { useCompromisos } from '../datos/useCompromisos';
 import { useTransacciones } from '../datos/useTransacciones';
+import { cerrarCompromiso, reabrirCompromiso, borrarCompromiso } from '../datos/compromisos';
+import { mostrarAviso } from '../avisos/avisos';
 import { deISO, hoyISO } from '../transacciones/fechas';
+import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { paleta } from '../tema/colores';
-import { abonadoDe, abonosDe, diasDeAtraso, estadoDe, pendienteDe } from './calculos';
+import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe } from './calculos';
 import { ModalAbono } from './ModalAbono';
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -31,6 +34,10 @@ function diaLargo(iso: string): string {
 // escribir nada. Los botones llegan en #134, #135 y #137.
 export function PantallaDetalleCompromiso({ id }: { id: string }) {
   const [modalAbono, setModalAbono] = useState(false);
+  const [modalEditar, setModalEditar] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [dialogo, setDialogo] = useState<'perdonar' | 'cancelar' | 'borrar'>();
+  const [trabajando, setTrabajando] = useState(false);
   const margenes = useSafeAreaInsets();
   const enrutador = useRouter();
   const { compromisos, cargando } = useCompromisos();
@@ -91,6 +98,77 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
   const abonos = abonosDe(compromiso.id ?? '', transacciones).slice().reverse();
   const vencido = estado === 'vencido';
   const abierto = estado === 'activo' || estado === 'vencido';
+  const amarradas = amarradasA(compromiso.id ?? '', transacciones);
+  // Alias estrechado: las funciones asíncronas no heredan el estrechamiento.
+  const compromisoActual = compromiso;
+
+  async function perdonar() {
+    if (!compromisoActual.id || trabajando) {
+      return;
+    }
+    setTrabajando(true);
+    try {
+      await cerrarCompromiso(compromisoActual.id, 'perdonado');
+      mostrarAviso({ mensaje: 'Compromiso perdonado', tipo: 'exito' });
+      setDialogo(undefined);
+    } catch (error) {
+      console.error('No se pudo perdonar el compromiso:', error);
+      mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  async function cancelar() {
+    if (!compromisoActual.id || trabajando) {
+      return;
+    }
+    setTrabajando(true);
+    try {
+      await cerrarCompromiso(compromisoActual.id, 'cancelado');
+      mostrarAviso({ mensaje: 'Compromiso cancelado', tipo: 'exito' });
+      setDialogo(undefined);
+    } catch (error) {
+      console.error('No se pudo cancelar el compromiso:', error);
+      mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  async function reabrir() {
+    if (!compromisoActual.id || trabajando) {
+      return;
+    }
+    setTrabajando(true);
+    try {
+      await reabrirCompromiso(compromisoActual.id);
+      mostrarAviso({ mensaje: 'Compromiso reabierto', tipo: 'exito' });
+    } catch (error) {
+      console.error('No se pudo reabrir el compromiso:', error);
+      mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
+    } finally {
+      setTrabajando(false);
+    }
+  }
+
+  async function borrar(modo: 'todo' | 'soltar') {
+    if (!compromisoActual.id || trabajando) {
+      return;
+    }
+    setTrabajando(true);
+    try {
+      await borrarCompromiso(compromisoActual, amarradas, modo);
+      mostrarAviso({ mensaje: 'Compromiso borrado', tipo: 'exito' });
+      setDialogo(undefined);
+      enrutador.back();
+    } catch (error) {
+      console.error('No se pudo borrar el compromiso:', error);
+      mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
+    } finally {
+      setTrabajando(false);
+    }
+  }
 
   return (
     <View style={[estilos.raiz, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
@@ -109,7 +187,17 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
         <Text style={[estilos.titulo, { color: paleta.texto }]} numberOfLines={1}>
           {compromiso.contraparte}
         </Text>
-        <View style={estilos.ranura} />
+        <View style={estilos.ranura}>
+          <Pressable
+            style={estilos.atras}
+            accessibilityRole="button"
+            accessibilityLabel="Más acciones"
+            onPress={() => setMenu(true)}
+            hitSlop={8}
+          >
+            <Text style={[estilos.menuPuntos, { color: paleta.texto }]}>⋯</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={estilos.contenidoLista}>
@@ -205,6 +293,219 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
         alCerrar={() => setModalAbono(false)}
         compromiso={compromiso}
         transacciones={transacciones}
+      />
+
+      <Modal
+        visible={menu}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMenu(false)}
+      >
+        <View style={estilos.fondoDialogo}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="Cerrar"
+            onPress={() => setMenu(false)}
+          />
+          <View style={estilos.tarjetaMenu}>
+            <Pressable
+              style={estilos.itemMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Editar"
+              onPress={() => {
+                setMenu(false);
+                setModalEditar(true);
+              }}
+            >
+              <Text style={[estilos.itemMenuTexto, { color: paleta.texto }]}>Editar</Text>
+            </Pressable>
+            {compromiso.direccion === 'me_deben' && abierto ? (
+              <Pressable
+                style={estilos.itemMenu}
+                accessibilityRole="button"
+                accessibilityLabel="Perdonar lo pendiente"
+                onPress={() => {
+                  setMenu(false);
+                  setDialogo('perdonar');
+                }}
+              >
+                <Text style={[estilos.itemMenuTexto, { color: paleta.texto }]}>Perdonar lo pendiente</Text>
+              </Pressable>
+            ) : null}
+            {abierto ? (
+              <Pressable
+                style={estilos.itemMenu}
+                accessibilityRole="button"
+                accessibilityLabel="Cancelar"
+                onPress={() => {
+                  setMenu(false);
+                  setDialogo('cancelar');
+                }}
+              >
+                <Text style={[estilos.itemMenuTexto, { color: paleta.texto }]}>Cancelar</Text>
+              </Pressable>
+            ) : null}
+            {compromiso.cierre ? (
+              <Pressable
+                style={estilos.itemMenu}
+                accessibilityRole="button"
+                accessibilityLabel="Reabrir"
+                disabled={trabajando}
+                onPress={reabrir}
+              >
+                <Text style={[estilos.itemMenuTexto, { color: paleta.texto }]}>Reabrir</Text>
+              </Pressable>
+            ) : null}
+            <View style={[estilos.lineaMenu, { backgroundColor: paleta.separador }]} />
+            <Pressable
+              style={estilos.itemMenu}
+              accessibilityRole="button"
+              accessibilityLabel="Borrar"
+              onPress={() => {
+                setMenu(false);
+                setDialogo('borrar');
+              }}
+            >
+              <Text style={[estilos.itemMenuTexto, { color: paleta.rojoMonto }]}>Borrar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!dialogo}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setDialogo(undefined)}
+      >
+        <View style={estilos.fondoDialogo}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="Cerrar"
+            onPress={() => setDialogo(undefined)}
+          />
+          <View style={estilos.tarjetaDialogo}>
+            {dialogo === 'perdonar' ? (
+              <>
+                <Text style={[estilos.tituloDialogo, { color: paleta.texto }]}>
+                  ¿Perdonar los $ {pendiente.toFixed(2)} que te debe {compromiso.contraparte}? El
+                  préstamo se cierra y tu saldo no cambia.
+                </Text>
+                <View style={estilos.botonesDialogo}>
+                  <Pressable
+                    style={[estilos.botonDialogo, { backgroundColor: paleta.verdeAccion }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Perdonar"
+                    disabled={trabajando}
+                    onPress={perdonar}
+                  >
+                    <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Perdonar</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[estilos.botonDialogo, { backgroundColor: paleta.dialogoBoton }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Volver"
+                    disabled={trabajando}
+                    onPress={() => setDialogo(undefined)}
+                  >
+                    <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Volver</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : dialogo === 'cancelar' ? (
+              <>
+                <Text style={[estilos.tituloDialogo, { color: paleta.texto }]}>
+                  ¿Cancelar este compromiso? Se guarda en Cerrados con su historial.
+                </Text>
+                <View style={estilos.botonesDialogo}>
+                  <Pressable
+                    style={[estilos.botonDialogo, { backgroundColor: paleta.naranjaCartera }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancelar compromiso"
+                    disabled={trabajando}
+                    onPress={cancelar}
+                  >
+                    <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>
+                      Cancelar compromiso
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[estilos.botonDialogo, { backgroundColor: paleta.dialogoBoton }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Volver"
+                    disabled={trabajando}
+                    onPress={() => setDialogo(undefined)}
+                  >
+                    <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Volver</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : dialogo === 'borrar' ? (
+              <>
+                <Text style={[estilos.tituloDialogo, { color: paleta.texto }]}>
+                  ¿Borrar el compromiso con {compromiso.contraparte}? Tiene {amarradas.length}{' '}
+                  {amarradas.length === 1 ? 'transacción' : 'transacciones'}.
+                </Text>
+                <View style={estilos.botonesDialogo}>
+                  {amarradas.length > 0 ? (
+                    <Pressable
+                      style={[estilos.botonDialogo, { backgroundColor: paleta.rojo }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Borrar también las transacciones"
+                      disabled={trabajando}
+                      onPress={() => borrar('todo')}
+                    >
+                      <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>
+                        Borrar también las transacciones
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {amarradas.length > 0 ? (
+                    <Pressable
+                      style={[estilos.botonDialogo, { backgroundColor: paleta.dialogoBoton }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Dejar las transacciones"
+                      disabled={trabajando}
+                      onPress={() => borrar('soltar')}
+                    >
+                      <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>
+                        Dejar las transacciones
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  {amarradas.length === 0 ? (
+                    <Pressable
+                      style={[estilos.botonDialogo, { backgroundColor: paleta.rojo }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Borrar"
+                      disabled={trabajando}
+                      onPress={() => borrar('soltar')}
+                    >
+                      <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Borrar</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    style={[estilos.botonDialogo, { backgroundColor: paleta.dialogoBoton }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Volver"
+                    disabled={trabajando}
+                    onPress={() => setDialogo(undefined)}
+                  >
+                    <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Volver</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <ModalAgregarTransaccion
+        visible={modalEditar}
+        alCerrar={() => setModalEditar(false)}
+        compromiso={compromiso}
       />
     </View>
   );
@@ -336,6 +637,65 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     paddingTop: 24,
+  },
+  menuPuntos: {
+    fontSize: 24,
+    fontWeight: '700',
+    lineHeight: 28,
+  },
+  fondoDialogo: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    position: 'relative',
+  },
+  tarjetaDialogo: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 16,
+    backgroundColor: paleta.dialogo,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+  tituloDialogo: {
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  botonesDialogo: {
+    gap: 12,
+    marginTop: 20,
+  },
+  botonDialogo: {
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botonDialogoTexto: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tarjetaMenu: {
+    width: '100%',
+    maxWidth: 300,
+    borderRadius: 14,
+    backgroundColor: paleta.dialogo,
+    paddingVertical: 6,
+  },
+  itemMenu: {
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+  },
+  itemMenuTexto: {
+    fontSize: 15,
+  },
+  lineaMenu: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 4,
   },
   accion: {
     borderRadius: 14,

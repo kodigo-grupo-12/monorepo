@@ -26,9 +26,11 @@ import { actualizarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { mostrarAviso } from '../avisos/avisos';
-import { crearCompromiso } from '../datos/compromisos';
-import type { Direccion, Naturaleza } from '../datos/compromisos';
+import { actualizarCompromiso, crearCompromiso } from '../datos/compromisos';
+import type { Compromiso as CompromisoDoc, Direccion, Naturaleza } from '../datos/compromisos';
 import { contraparteValida, normalizarTelefono } from '../compromisos/contraparte';
+import { abonadoDe, validarNuevoMonto } from '../compromisos/calculos';
+import { useTransacciones } from '../datos/useTransacciones';
 
 const TOPE_B64 = 700 * 1024;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -73,7 +75,12 @@ function seguroTelefono(texto: string): string | undefined {
   }
 }
 
-type PropsModal = { visible: boolean; alCerrar: () => void; transaccion?: Transaccion };
+type PropsModal = {
+  visible: boolean;
+  alCerrar: () => void;
+  transaccion?: Transaccion;
+  compromiso?: CompromisoDoc;
+};
 
 type Vista = 'form' | 'categoria' | 'cartera';
 
@@ -83,10 +90,12 @@ type Vista = 'form' | 'categoria' | 'cartera';
 // mismo modal con alta rápida inline y guarda categoria_id. En modo edición
 // (ADR-0012) recibe el documento precargado y no se duplica el modal. El
 // modal sigue sin navbar: única excepción a la regla de la T005.
-export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: PropsModal) {
+export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compromiso }: PropsModal) {
   // La presencia del documento define el modo: la X cierra sin guardar en
   // los dos modos.
   const enEdicion = !!transaccion;
+  // Modo edición de compromiso (#135): mismo modal, documento precargado.
+  const enEdicionCompromiso = !!compromiso;
   const margenes = useSafeAreaInsets();
   const [tipo, setTipo] = useState<TipoTransaccion>('gasto');
   const [montoTexto, setMontoTexto] = useState('');
@@ -124,6 +133,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
   const categoriaSeleccionada = categorias.find((categoria) => categoria.id === categoriaId);
   const { carteras } = useCarteras();
   const carteraSeleccionada = carteras.find((cartera) => cartera.id === carteraId);
+  const { transacciones } = useTransacciones();
 
   // Crear arranca limpio; editar precarga el documento tocado. La fecha se
   // construye por partes para que la zona horaria no corra el día. La X
@@ -146,6 +156,30 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
       setNuevaCartera('');
       return;
     }
+    if (compromiso) {
+      setSegmento('compromiso');
+      setDireccion(compromiso.direccion);
+      setNaturaleza(compromiso.naturaleza);
+      setContraparteTexto(compromiso.contraparte);
+      setTelefonoTexto(compromiso.telefono ?? '');
+      setMontoTexto(`${compromiso.monto}`);
+      if (compromiso.vence) {
+        const [anioV, mesV, diaV] = compromiso.vence.split('-').map(Number);
+        setVenceFecha(new Date(anioV, mesV - 1, diaV));
+      } else {
+        setVenceFecha(undefined);
+      }
+      setNotaTexto(compromiso.nota ?? '');
+      setConOrigen(false);
+      setFoto(undefined);
+      const [anioC, mesC, diaC] = compromiso.fecha.split('-').map(Number);
+      setFecha(new Date(anioC, mesC - 1, diaC));
+      setCategoriaId(compromiso.categoria_id);
+      setVista('form');
+      setNuevaCategoria('');
+      setNuevaCartera('');
+      return;
+    }
     setTipo('gasto');
     setMontoTexto('');
     setNotaTexto('');
@@ -163,7 +197,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
     setTelefonoTexto('');
     setVenceFecha(undefined);
     setConOrigen(true);
-  }, [visible, transaccion]);
+  }, [visible, transaccion, compromiso]);
 
   // Monto: solo dígitos y un punto con hasta dos decimales.
   function alCambiarMonto(texto: string) {
@@ -186,11 +220,23 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
   const montoValido = /^\d+(\.\d{1,2})?$/.test(montoTexto) && Number(montoTexto) > 0;
   const telefonoSeguro = telefonoTexto.trim() ? seguroTelefono(telefonoTexto) : undefined;
   const telefonoInvalido = !!telefonoTexto.trim() && telefonoSeguro === undefined;
+  // En edición del compromiso (#135) el monto nuevo no puede quedar por
+  // debajo de lo ya abonado.
+  const abonadoCompromiso =
+    enEdicionCompromiso && compromiso?.id ? abonadoDe(compromiso.id, transacciones) : 0;
+  const validacionMontoNuevo =
+    enEdicionCompromiso && montoValido
+      ? validarNuevoMonto(Number(montoTexto), abonadoCompromiso)
+      : undefined;
   const compromisoValido =
     montoValido &&
     contraparteValida(contraparteTexto) &&
     !telefonoInvalido &&
-    (naturaleza === 'dinero' ? !conOrigen || !!carteraId : !!categoriaId);
+    (enEdicionCompromiso
+      ? validacionMontoNuevo !== 'menor_que_abonado'
+      : naturaleza === 'dinero'
+        ? !conOrigen || !!carteraId
+        : !!categoriaId);
   const listo = segmento === 'compromiso' ? compromisoValido : montoValido && !!categoriaId && !!carteraId;
 
   async function elegirFoto() {
@@ -244,6 +290,29 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
   }
 
   async function guardar() {
+    if (enEdicionCompromiso && compromiso?.id) {
+      if (!listo || guardando) {
+        return;
+      }
+      setGuardando(true);
+      try {
+        await actualizarCompromiso(compromiso.id, {
+          contraparte: contraparteTexto,
+          telefono: telefonoSeguro,
+          monto: Number(montoTexto),
+          vence: venceFecha ? fechaISO(venceFecha) : undefined,
+          nota: notaTexto.trim() ? notaTexto.trim() : undefined,
+        });
+        mostrarAviso({ mensaje: 'Compromiso guardado', tipo: 'exito' });
+        alCerrar();
+      } catch (error) {
+        console.error('No se pudo actualizar el compromiso:', error);
+        mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
+      } finally {
+        setGuardando(false);
+      }
+      return;
+    }
     if (segmento === 'compromiso') {
       if (!listo || guardando) {
         return;
@@ -364,9 +433,11 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
               ? 'Categoría'
               : vista === 'cartera'
                 ? 'Cartera'
-                : enEdicion
-                  ? 'Editar transacción'
-                  : 'Agregar transacción'}
+                : enEdicionCompromiso
+                  ? 'Editar compromiso'
+                  : enEdicion
+                    ? 'Editar transacción'
+                    : 'Agregar transacción'}
           </Text>
           <View style={estilos.ranura} />
         </View>
@@ -485,6 +556,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
           </ScrollView>
         ) : (
           <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+            {!enEdicionCompromiso ? (
             <View style={estilos.selector}>
               {(enEdicion
                 ? (['gasto', 'ingreso'] as const)
@@ -516,6 +588,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                 </Pressable>
               ))}
             </View>
+            ) : null}
 
 {segmento !== 'compromiso' ? (
             <>
@@ -657,6 +730,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                   style={[estilos.segmento, direccion === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: direccion === valor }}
+                  disabled={enEdicionCompromiso}
                   onPress={() => setDireccion(valor)}
                 >
                   <Text
@@ -679,6 +753,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                   style={[estilos.segmento, naturaleza === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: naturaleza === valor }}
+                  disabled={enEdicionCompromiso}
                   onPress={() => {
                     if (valor !== naturaleza) {
                       setCategoriaId(undefined);
@@ -739,6 +814,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
               />
             </View>
 
+            {validacionMontoNuevo === 'menor_que_abonado' ? (
+              <Text style={[estilos.errorTexto, { color: paleta.rojo }]}>
+                No puede ser menor que lo ya abonado ($ {abonadoCompromiso.toFixed(2)})
+              </Text>
+            ) : null}
+
+{!enEdicionCompromiso ? (
             <View style={estilos.fila}>
               <View style={estilos.calendario}>
                 <View style={estilos.calendarioPinIzquierdo} />
@@ -765,6 +847,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                 <View style={estilos.flechaDerecha} />
               </Pressable>
             </View>
+            ) : null}
 
             <View style={estilos.fila}>
               <View style={estilos.calendario}>
@@ -806,7 +889,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
               )}
             </View>
 
-            {naturaleza === 'dinero' ? (
+            {!enEdicionCompromiso ? naturaleza === 'dinero' ? (
               <>
                 <Pressable
                   style={estilos.filaAccion}
@@ -876,7 +959,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                 </Text>
                 <View style={estilos.chevron} />
               </Pressable>
-            )}
+            ) : null}
 
             <View style={estilos.fila}>
               <View style={estilos.notas}>
