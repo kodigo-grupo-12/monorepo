@@ -13,6 +13,7 @@ import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { aspectoDe } from '../categorias/mapaCategorias';
 import { DIAS_ABREV, DIAS_SEMANA, MESES, aISO, deISO, hoyISO } from './fechas';
 import { CalendarioTransacciones } from './CalendarioTransacciones';
+import { SelectorCartera } from './SelectorCartera';
 
 // Ancho fijo de cada día de la tira, para poder alinear el día activo.
 const ANCHO_DIA = 62;
@@ -35,6 +36,7 @@ export function PantallaTransacciones() {
   const [diaISO, setDiaISO] = useState<string>(hoyISO());
   const [carteraId, setCarteraId] = useState<string>();
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   // Saldo real calculado (regla de la T007): nunca se guarda, se agrega en
@@ -115,6 +117,7 @@ export function PantallaTransacciones() {
             style={estilos.pastilla}
             accessibilityRole="button"
             accessibilityLabel="Seleccionar cartera"
+            onPress={() => setSelectorAbierto(true)}
           >
             <GlifoBilleteraLinea />
             <Text style={[estilos.pastillaTexto, { color: paleta.texto }]} numberOfLines={1}>
@@ -241,6 +244,18 @@ export function PantallaTransacciones() {
         alSeleccionar={(iso) => {
           setDiaISO(iso);
           setCalendarioAbierto(false);
+        }}
+      />
+
+      <SelectorCartera
+        visible={selectorAbierto}
+        carteras={carteras}
+        transacciones={transacciones}
+        seleccionadaId={carteraId}
+        alCerrar={() => setSelectorAbierto(false)}
+        alSeleccionar={(id) => {
+          setCarteraId(id);
+          setSelectorAbierto(false);
         }}
       />
     </View>

@@ -13,6 +13,8 @@ export const paleta = {
   puntoInactivo: '#787C80',
   textoSuave: '#A3AAA7',
   teal: '#26A69A',
+  globoTotal: '#00897B',
+  naranjaCartera: '#FF9800',
   rojo: '#E53935',
   azulMonto: '#4FC3F7',
   rojoMonto: '#FF453A',
