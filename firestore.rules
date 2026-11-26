@@ -3,7 +3,8 @@ rules_version = '2';
 // Niega todo por defecto. Una sesión solo toca documentos cuyo uid es el
 // suyo. Las categorías de producción viven en la misma colección, sin uid
 // y con global: true (issue #3). Cualquier sesión las lee (get, o list con
-// where global==true) y nadie las escribe desde la app.
+// where global==true) y nadie las escribe desde la app. Los compromisos de
+// «Deudas y préstamos» (ADR-0019) siguen el mismo esquema por dueño.
 service cloud.firestore {
   match /databases/{database}/documents {
     function autenticado() {
@@ -33,11 +34,36 @@ service cloud.firestore {
     }
 
     function transaccionValida() {
-      return request.resource.data.tipo in ['gasto', 'ingreso']
-        && request.resource.data.monto is number
-        && request.resource.data.monto > 0
-        && request.resource.data.fecha is string
-        && request.resource.data.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+      let d = request.resource.data;
+      return d.tipo in ['gasto', 'ingreso']
+        && d.monto is number
+        && d.monto > 0
+        && d.fecha is string
+        && d.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (!('rol' in d) || (d.rol in ['origen', 'abono'] && d.compromiso_id is string))
+        && (!('neutral' in d) || d.neutral is bool);
+    }
+
+    function compromisoValido() {
+      let d = request.resource.data;
+      return d.direccion in ['me_deben', 'debo']
+        && d.naturaleza in ['dinero', 'compra']
+        && d.contraparte is string && d.contraparte.size() > 0 && d.contraparte.size() <= 60
+        && d.monto is number && d.monto > 0
+        && d.fecha is string && d.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (!('vence' in d) || (d.vence is string && d.vence.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && (!('telefono' in d) || (d.telefono is string && d.telefono.matches('^[0-9]{8,15}$')))
+        && (!('cierre' in d) || d.cierre in ['perdonado', 'cancelado'])
+        && (!('precio_contado' in d) || (d.precio_contado is number && d.precio_contado > 0))
+        && (!('plan' in d) || planValido(d.plan));
+    }
+
+    function planValido(p) {
+      return p.modo in ['fijo', 'variable']
+        && p.numero_cuotas is int && p.numero_cuotas >= 1 && p.numero_cuotas <= 120
+        && p.dia is int && p.dia >= 1 && p.dia <= 31
+        && p.primera is string && p.primera.matches('^[0-9]{4}-[0-9]{2}$')
+        && (p.modo == 'variable' || (p.cuota is number && p.cuota > 0));
     }
 
     match /{document=**} {
@@ -55,6 +81,13 @@ service cloud.firestore {
       allow read: if esDuenio();
       allow create: if uidPropioAlCrear();
       allow update: if esDuenio() && uidNoCambia();
+      allow delete: if esDuenio();
+    }
+
+    match /compromisos/{id} {
+      allow read: if esDuenio();
+      allow create: if uidPropioAlCrear() && sinGlobal() && compromisoValido();
+      allow update: if esDuenio() && uidNoCambia() && sinGlobal() && compromisoValido();
       allow delete: if esDuenio();
     }
 
