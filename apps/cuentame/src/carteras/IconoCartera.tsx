@@ -1,10 +1,10 @@
-import { StyleSheet, View } from 'react-native';
+﻿import { StyleSheet, View } from 'react-native';
 
 import { paleta } from '../tema/colores';
 
-// Glifo de billetera dibujado con vistas, como quedó en la T004: Expo SDK 58
+// Glifo de cartera dibujado con vistas, como quedo en la T004: Expo SDK 58
 // ya no trae un set de iconos y no se agrega ninguna dependencia nueva.
-export function IconoBilletera({ fondo = paleta.teal }: { fondo?: string }) {
+export function IconoCartera({ fondo = paleta.teal }: { fondo?: string }) {
   return (
     <View style={[estilos.circulo, { backgroundColor: fondo }]}>
       <View style={estilos.cuerpo} />
