@@ -80,14 +80,12 @@ function IconoApagado() {
   );
 }
 
-function BannerDemo() {
+function ChipDemo() {
+  // Chip limpio con borde verde (T013): la marca de cuenta demo se queda,
+  // el banderín no.
   return (
-    <View style={estilos.banner}>
-      <View style={[estilos.bannerAlaIzquierda, { borderRightColor: paleta.bannerSombra }]} />
-      <View style={[estilos.bannerCuerpo, { backgroundColor: paleta.banner }]}>
-        <Text style={estilos.bannerTexto}>CUENTA DEMO</Text>
-      </View>
-      <View style={[estilos.bannerAlaDerecha, { borderLeftColor: paleta.bannerSombra }]} />
+    <View style={estilos.chip}>
+      <Text style={estilos.chipTexto}>CUENTA DEMO</Text>
     </View>
   );
 }
@@ -160,28 +158,22 @@ export function PantallaCuenta() {
       </View>
       <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
 
-      <Pressable
-        style={estilos.perfil}
-        accessibilityRole="button"
-        accessibilityLabel={`Perfil de ${cuentaDemo.nombre}`}
-        onPress={verDesarrollo}
-      >
+      <View style={estilos.perfil}>
         <View style={estilos.perfilCentro}>
-          <View style={[estilos.avatar, { backgroundColor: paleta.teal }]}>
-            <Text style={estilos.avatarInicial}>{inicial}</Text>
+          <View style={estilos.anillo}>
+            <View style={[estilos.avatar, { backgroundColor: paleta.teal }]}>
+              <Text style={estilos.avatarInicial}>{inicial}</Text>
+            </View>
           </View>
-          <View style={estilos.bannerMontado}>
-            <BannerDemo />
+          <View style={estilos.chipMontado}>
+            <ChipDemo />
           </View>
         </View>
         <View style={estilos.perfilTextos}>
           <Text style={[estilos.perfilNombre, { color: paleta.texto }]}>{cuentaDemo.nombre}</Text>
           <Text style={[estilos.perfilCorreo, { color: paleta.textoSuave }]}>{cuentaDemo.correo}</Text>
         </View>
-        <View style={estilos.perfilChevron}>
-          <IconoChevron />
-        </View>
-      </Pressable>
+      </View>
 
       <View>
         <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verCarteras} />
@@ -254,42 +246,28 @@ const estilos = StyleSheet.create({
     fontSize: 42,
     fontWeight: '700',
   },
-  bannerMontado: {
+  chipMontado: {
     position: 'absolute',
-    top: 74,
+    top: 86,
   },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  chip: {
+    borderWidth: 1.5,
+    borderColor: paleta.verdeAccion,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
   },
-  bannerAlaIzquierda: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 15,
-    borderBottomWidth: 15,
-    borderRightWidth: 12,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  bannerCuerpo: {
-    height: 30,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-  bannerTexto: {
+  chipTexto: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
   },
-  bannerAlaDerecha: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 15,
-    borderBottomWidth: 15,
-    borderLeftWidth: 12,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
+  anillo: {
+    borderWidth: 2.5,
+    borderColor: paleta.verdeAccion,
+    borderRadius: 55,
+    padding: 3,
   },
   perfilTextos: {
     alignItems: 'center',
@@ -302,11 +280,6 @@ const estilos = StyleSheet.create({
   perfilCorreo: {
     fontSize: 15,
     marginTop: 4,
-  },
-  perfilChevron: {
-    position: 'absolute',
-    right: 20,
-    top: 60,
   },
   grupo: {
     marginTop: 24,
