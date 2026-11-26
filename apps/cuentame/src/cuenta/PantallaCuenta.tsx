@@ -260,6 +260,7 @@ const estilos = StyleSheet.create({
     top: 86,
   },
   chip: {
+    minWidth: 150,
     borderWidth: 1.5,
     borderColor: paleta.verdeAccion,
     borderRadius: 999,
