@@ -90,6 +90,10 @@ export function hoyEnElSalvador(): string {
   return new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 10);
 }
 
+// La elección que la pantalla de bienvenida (issue #145) le pide a la
+// persona: cargar el historial de ejemplo o empezar de cero.
+export type OpcionArranque = 'ejemplo' | 'cero';
+
 // La pantalla de bienvenida (spec #143) solo aparece cuando la cuenta está
 // totalmente vacía: sin carteras y sin transacciones. Con cualquiera de las
 // dos ya no se pregunta, así el reingreso con la misma cuenta no repregunta.
