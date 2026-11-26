@@ -56,7 +56,15 @@ jobs:
         env:
           PAGES_DEPLOY: "1"
           PAGES_BASE_URL: /monorepo/
+          EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+          EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+          EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          EXPO_PUBLIC_FIREBASE_APP_ID: ${{ vars.EXPO_PUBLIC_FIREBASE_APP_ID }}
         run: npx expo export --platform web
+
+      - name: Fallback de SPA para rutas profundas
+        run: cp apps/cuentame/dist/index.html apps/cuentame/dist/404.html
 
       - name: Configurar Pages
         uses: actions/configure-pages@v5
@@ -69,3 +77,17 @@ jobs:
       - id: pagina
         name: Publicar
         uses: actions/deploy-pages@v4
+
+      - name: Verificar el despliegue
+        run: |
+          sleep 10
+          for i in 1 2 3; do
+            raiz=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.pagina.outputs.page_url }}")
+            [ "$raiz" = 200 ] && break
+            sleep 10
+          done
+          echo "GET / -> $raiz"
+          test "$raiz" = 200
+          spa=$(curl -s "${{ steps.pagina.outputs.page_url }}inicio")
+          echo "$spa" | grep -q 'id="root"' && echo "GET /inicio -> SPA servida (fallback 404.html)"
+          test "$spa" = "$(curl -s "${{ steps.pagina.outputs.page_url }}")"
