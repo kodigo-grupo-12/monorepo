@@ -23,7 +23,7 @@ import type { Transaccion } from '../datos/transacciones';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { IconoBilletera } from '../carteras/IconoBilletera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
-import { MESES, aISO } from '../transacciones/fechas';
+import { MESES, aISO, deISO } from '../transacciones/fechas';
 
 type Periodo = 'semana' | 'mes';
 
@@ -195,6 +195,8 @@ export function PantallaInicio() {
         (clave.includes('-') ? nombresDeCategoria.get(clave) : undefined) ?? clave,
       porcentaje: gastoTotalGasto > 0 ? Math.round((monto / gastoTotalGasto) * 100) : 0,
     }));
+
+  const recientes = transacciones.slice(0, 5);
 
   const saldoTexto = (monto: number): string =>
     montosVisibles ? `$ ${monto < 0 ? '-' : ''}${Math.abs(monto).toFixed(2)}` : MONTOS_OCULTOS;
@@ -439,6 +441,78 @@ function GlifoOjo() {
   );
 }
 
+// Fila de Transacciones recientes: círculo con glifo y color de la
+// categoría (mapa fijo T007), título = categoría, subtítulo = fecha de la
+// transacción y monto coloreado como MoneyLover (ingresos azul, gastos
+// rojo). Con el ojito oculto el monto pasa a ***** conservando su color.
+function FilaReciente({
+  transaccion,
+  nombreCategoria,
+  montosVisibles,
+  alEditar,
+  alEliminar,
+}: {
+  transaccion: Transaccion;
+  nombreCategoria?: string;
+  montosVisibles: boolean;
+  alEditar: () => void;
+  alEliminar: () => void;
+}) {
+  const fecha = deISO(transaccion.fecha);
+
+  return (
+    <Pressable
+      style={estilos.filaReciente}
+      accessibilityRole="button"
+      accessibilityLabel="Editar transacción"
+      onPress={alEditar}
+    >
+      <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
+      <View style={estilos.detallesReciente}>
+        <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
+          {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
+        </Text>
+        <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
+          {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
+        </Text>
+      </View>
+      <Pressable
+        style={estilos.papeleraReciente}
+        accessibilityRole="button"
+        accessibilityLabel="Eliminar transacción"
+        onPress={alEliminar}
+        hitSlop={6}
+      >
+        <GlifoPapelera />
+      </Pressable>
+      <Text
+        style={[
+          estilos.montoReciente,
+          { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
+        ]}
+      >
+        {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
+      </Text>
+    </Pressable>
+  );
+}
+
+// Papelera dibujada con vistas, como quedó en la T004: Expo SDK 58 ya no
+// trae un set de iconos y no se agrega ninguna dependencia nueva.
+function GlifoPapelera() {
+  const verde = paleta.verdeAccion;
+
+  return (
+    <View style={estilos.papelera}>
+      <View style={[estilos.papeleraAsa, { backgroundColor: verde }]} />
+      <View style={[estilos.papeleraTapa, { backgroundColor: verde }]} />
+      <View style={[estilos.papeleraCuerpo, { borderColor: verde }]} />
+      <View style={[estilos.papeleraLinea, { backgroundColor: verde, left: 7 }]} />
+      <View style={[estilos.papeleraLinea, { backgroundColor: verde, left: 11 }]} />
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
   contenedor: {
     flex: 1,
@@ -618,39 +692,70 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  fila: {
+  filaReciente: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: paleta.superficie,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginTop: 12,
+    marginTop: 14,
   },
-  fecha: {
-    fontSize: 13,
-  },
-  detalles: {
+  detallesReciente: {
     flex: 1,
+    marginLeft: 10,
   },
-  nota: {
-    fontSize: 15,
+  tituloReciente: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  categoria: {
+  fechaReciente: {
     fontSize: 13,
     marginTop: 2,
   },
-  monto: {
-    fontSize: 15,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  papeleraBoton: {
-    width: 26,
-    height: 26,
+  papeleraReciente: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  montoReciente: {
+    fontSize: 16,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  papelera: {
+    width: 20,
+    height: 22,
+  },
+  papeleraAsa: {
+    position: 'absolute',
+    top: 0,
+    left: 7,
+    width: 6,
+    height: 2,
+    borderRadius: 1,
+  },
+  papeleraTapa: {
+    position: 'absolute',
+    top: 3,
+    left: 0,
+    width: 20,
+    height: 2,
+    borderRadius: 1,
+  },
+  papeleraCuerpo: {
+    position: 'absolute',
+    top: 6,
+    left: 3,
+    width: 14,
+    height: 14,
+    borderWidth: 2,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+  },
+  papeleraLinea: {
+    position: 'absolute',
+    top: 9,
+    width: 2,
+    height: 7,
   },
   fondoDialogo: {
     flex: 1,
