@@ -9,3 +9,8 @@ ios/
 *.aab
 .DS_Store
 .env
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*-debug.log

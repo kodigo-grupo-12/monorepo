@@ -21,16 +21,16 @@ La pantalla de láminas que sigue al splash cuando todavía no hay sesión.
 _Avoid_: onboarding, tutorial, bienvenida
 
 **Login**:
-La pantalla donde la persona escribe el correo y la contraseña para entrar.
+La pantalla donde la persona entra con su cuenta de Google (botón «Continuar con Google»). En Expo Go avisa que por ahora Cuéntame se usa en el navegador.
 _Avoid_: sign-in, autenticación
 
 **Cuenta demo**:
-El correo demo@cuentame.com y la contraseña demo1234, ya escritos en el login, con los que se entra en esta etapa.
+La cuenta fija demo@cuentame.com / demo1234 con la que se entraba antes del login con Google. Ya no se ofrece en el login.
 _Avoid_: cuenta temporal, usuario de prueba
 
 **Sesión**:
-El recuerdo de que la persona ya entró. Si existe, el splash deja ver el inicio. Sigue ahí aunque se cierre la app.
-_Avoid_: token, Firebase
+La sesión persistente de Firebase Auth. Si existe, el splash deja ver el inicio. Sigue ahí al recargar. El proveedor expone `cargando`, `activa`, `entrar`, `salir` y el usuario actual (`uid`, `nombre`, `correo`, `foto`).
+_Avoid_: marca local, token propio
 
 **Inicio**:
 La pantalla de después de entrar. También es la que sigue al splash cuando ya hay sesión. Hoy muestra el texto «Cuéntame».
@@ -77,11 +77,11 @@ _Avoid_: dummy, stub, pantalla vacía
 ### La pantalla Cuenta
 
 **Perfil**:
-El bloque de Cuenta con el avatar, el banner, el nombre y el correo de la cuenta.
+El bloque de Cuenta con el avatar, el nombre y el correo de la cuenta de Google.
 _Avoid_: usuario
 
 **Avatar**:
-El círculo con la inicial de la cuenta demo, arriba del perfil.
+El círculo con la inicial de la cuenta de Google, arriba del perfil.
 _Avoid_: foto de perfil
 
 **Toast**:
@@ -89,7 +89,7 @@ El aviso breve «En desarrollo» que aparece al entrar al placeholder y desapare
 _Avoid_: snackbar, notificación, alerta
 
 **Cerrar sesión**:
-La acción que borra la sesión guardada y regresa al splash con el carrusel y el login.
+La acción que cierra la sesión de Firebase Auth y regresa al splash con el carrusel y el login.
 _Avoid_: logout, desloguearse
 
 ### Las transacciones

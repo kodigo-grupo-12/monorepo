@@ -16,9 +16,10 @@ include make/doctor.mk
 include make/dev.mk
 include make/mobile.mk
 include make/quality.mk
+include make/firebase.mk
 
 .PHONY: help
-help: help-doctor help-dev help-mobile help-quality
+help: help-doctor help-dev help-mobile help-quality help-firebase
 	@printf "\n$(GREEN)  ✓ done$(NC)\n"
 	@printf "\n$(YELLOW)📋 Quick Actions:$(NC)\n"
 	@printf "$(DIM)────────────────────────────────────────────────────────────────────────────────$(NC)\n"
