@@ -46,6 +46,24 @@ function peticion(modelo: ModeloAgente, extras: Partial<PeticionOrquestador> = {
 }
 
 describe('orquestador', () => {
+  it('conserva las partes crudas del turno del modelo al reenviarlas', async () => {
+    const modelo = new ModeloFalso();
+    // Hallazgo del 2026-11-26 en vivo: la API exige devolver el
+    // thought_signature del functionCall. El orquestador debe copiar
+    // ese campo opaco tal cual, sin tocarlo.
+    modelo.guion = [
+      { tipo: 'herramientas', llamadas: [{ id: 'a', nombre: 'resolver_categoria', argumentos: { texto: 'comida' } }], crudo: [{ functionCall: { name: 'resolver_categoria', args: { texto: 'comida' }, id: 'a', thoughtSignature: 'firma' } }] },
+      { tipo: 'texto', texto: 'Listo.' },
+    ];
+    const respuesta = await preguntar(peticion(modelo));
+    expect(respuesta).toMatchObject({ tipo: 'respuesta', texto: 'Listo.' });
+    const turno = modelo.envios[1].mensajes[1];
+    expect(turno).toEqual({
+      rol: 'modelo',
+      llamadas: [{ id: 'a', nombre: 'resolver_categoria', argumentos: { texto: 'comida' } }],
+      crudo: [{ functionCall: { name: 'resolver_categoria', args: { texto: 'comida' }, id: 'a', thoughtSignature: 'firma' } }],
+    });
+  });
   it('ejecuta las herramientas pedidas y devuelve sus resultados al modelo con el mismo id', async () => {
     const modelo = new ModeloFalso();
     modelo.guion = [

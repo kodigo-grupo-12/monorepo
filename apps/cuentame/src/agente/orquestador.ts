@@ -144,7 +144,7 @@ export async function preguntar(peticion: PeticionOrquestador): Promise<Respuest
       // recibe las 4 rondas de resultados y, si vuelve a pedir
       // herramientas después de eso, recibe el mensaje de tope.
       if (ronda >= TOPE_RONDAS) break;
-      conversacion.push({ rol: 'modelo', llamadas: respuesta.llamadas });
+      conversacion.push({ rol: 'modelo', llamadas: respuesta.llamadas, crudo: respuesta.crudo });
       const resultados = respuesta.llamadas.map((llamada) => {
         let resultado: unknown;
         try {

@@ -13,12 +13,12 @@ export interface LlamadaHerramienta {
 export type MensajeAgente =
   | { rol: 'persona'; texto: string }
   | { rol: 'modelo'; texto: string }
-  | { rol: 'modelo'; llamadas: LlamadaHerramienta[] }
+  | { rol: 'modelo'; llamadas: LlamadaHerramienta[]; crudo?: unknown }
   | { rol: 'herramienta'; resultados: { id?: string; nombre: string; resultado: unknown }[] };
 
 export type RespuestaModelo =
   | { tipo: 'texto'; texto: string }
-  | { tipo: 'herramientas'; llamadas: LlamadaHerramienta[] };
+  | { tipo: 'herramientas'; llamadas: LlamadaHerramienta[]; crudo?: unknown };
 
 export interface PeticionAlModelo {
   instrucciones: string;
