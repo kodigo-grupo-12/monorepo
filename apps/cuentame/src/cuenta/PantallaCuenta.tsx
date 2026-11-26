@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
+import { Presionable } from '../animaciones/Presionable';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -79,14 +80,12 @@ function IconoApagado() {
   );
 }
 
-function BannerDemo() {
+function ChipDemo() {
+  // Chip limpio con borde verde (T013): la marca de cuenta demo se queda,
+  // el banderín no.
   return (
-    <View style={estilos.banner}>
-      <View style={[estilos.bannerAlaIzquierda, { borderRightColor: paleta.bannerSombra }]} />
-      <View style={[estilos.bannerCuerpo, { backgroundColor: paleta.banner }]}>
-        <Text style={estilos.bannerTexto}>CUENTA DEMO</Text>
-      </View>
-      <View style={[estilos.bannerAlaDerecha, { borderLeftColor: paleta.bannerSombra }]} />
+    <View style={estilos.chip}>
+      <Text style={estilos.chipTexto}>CUENTA DEMO</Text>
     </View>
   );
 }
@@ -103,16 +102,19 @@ function Fila({
   color?: string;
 }) {
   return (
-    <Pressable
+    <Presionable
       style={estilos.fila}
       accessibilityRole="button"
       accessibilityLabel={etiqueta}
       onPress={alTocar}
+      estiloContenido={{ flex: 1 }}
     >
-      {icono}
-      <Text style={[estilos.filaEtiqueta, { color }]}>{etiqueta}</Text>
-      <IconoChevron />
-    </Pressable>
+      <View style={estilos.filaInterna}>
+        {icono}
+        <Text style={[estilos.filaEtiqueta, { color }]}>{etiqueta}</Text>
+        <IconoChevron />
+      </View>
+    </Presionable>
   );
 }
 
@@ -121,13 +123,21 @@ export function PantallaCuenta() {
   const enrutador = useRouter();
   const { salir } = useSesion();
   const verDesarrollo = () => enrutador.push('/desarrollo');
-  // Enmienda puntual a la T005 (ADR-0011): las filas de esta tarea empujan
-  // su pantalla real; el resto de filas sigue con el placeholder.
-  const verCategorias = () => enrutador.push('/categorias');
+  // Enmienda puntual a la T005 (ADR-0011), extendida por la T013: las
+  // filas empujan su pantalla real. Categorías se reutiliza de la T007 en
+  // modo lectura y Mis carteras es la misma pantalla de siempre; Acerca y
+  // Configuraciones son pantallas nuevas locales. Soporte sigue con el
+  // placeholder porque no tiene pantalla todavía.
+  const verCategorias = () => enrutador.push('/cuenta/categorias');
   const verCarteras = () => enrutador.push('/carteras');
+  const verConfiguracion = () => enrutador.push('/cuenta/configuracion');
+  const verAcerca = () => enrutador.push('/cuenta/acerca');
 
-  // Sin confirmación (ADR-0008): al borrar la marca, la guardia del grupo con
-  // sesión manda a la entrada y el splash reinicia el recorrido completo.
+  // Confirmación al cerrar sesión (T013): revierte la decisión 7 de la
+  // T005 (ADR-0008 la declaraba sin confirmación). Al tocar la fila se
+  // pregunta; salir borra la marca y la guardia del grupo con sesión manda
+  // a la entrada, con el splash reiniciando el recorrido completo.
+  const [cerrando, setCerrando] = useState(false);
   const cerrarSesion = async () => {
     await salir();
   };
@@ -139,60 +149,71 @@ export function PantallaCuenta() {
     >
       <View style={estilos.encabezado}>
         <Text style={[estilos.encabezadoTitulo, { color: paleta.texto }]}>Cuenta</Text>
-        <Pressable
-          style={estilos.encabezadoSoporte}
-          accessibilityRole="button"
-          accessibilityLabel="Soporte"
-          onPress={verDesarrollo}
-        >
-          <Text style={[estilos.encabezadoSoporteTexto, { color: paleta.texto }]}>Soporte</Text>
-          <IconoSigno signo="?" />
-        </Pressable>
       </View>
       <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
 
-      <Pressable
-        style={estilos.perfil}
-        accessibilityRole="button"
-        accessibilityLabel={`Perfil de ${cuentaDemo.nombre}`}
-        onPress={verDesarrollo}
-      >
+      <View style={estilos.perfil}>
         <View style={estilos.perfilCentro}>
-          <View style={[estilos.avatar, { backgroundColor: paleta.teal }]}>
-            <Text style={estilos.avatarInicial}>{inicial}</Text>
+          <View style={estilos.anillo}>
+            <View style={[estilos.avatar, { backgroundColor: paleta.teal }]}>
+              <Text style={estilos.avatarInicial}>{inicial}</Text>
+            </View>
           </View>
-          <View style={estilos.bannerMontado}>
-            <BannerDemo />
+          <View style={estilos.chipMontado}>
+            <ChipDemo />
           </View>
         </View>
         <View style={estilos.perfilTextos}>
           <Text style={[estilos.perfilNombre, { color: paleta.texto }]}>{cuentaDemo.nombre}</Text>
           <Text style={[estilos.perfilCorreo, { color: paleta.textoSuave }]}>{cuentaDemo.correo}</Text>
         </View>
-        <View style={estilos.perfilChevron}>
-          <IconoChevron />
-        </View>
-      </Pressable>
+      </View>
 
       <View>
         <Fila etiqueta="Mis carteras" icono={<IconoCartera />} alTocar={verCarteras} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
         <Fila etiqueta="Categorías" icono={<IconoCaja />} alTocar={verCategorias} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
       </View>
 
       <View style={estilos.grupo}>
         <Fila etiqueta="Soporte" icono={<IconoSigno signo="?" />} alTocar={verDesarrollo} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verDesarrollo} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
-        <Fila etiqueta="Acerca" icono={<IconoSigno signo="i" />} alTocar={verDesarrollo} />
-        <View style={[estilos.linea, { backgroundColor: paleta.separador }]} />
+        <Fila etiqueta="Configuraciones" icono={<IconoEngranaje />} alTocar={verConfiguracion} />
+        <Fila etiqueta="Acerca" icono={<IconoSigno signo="i" />} alTocar={verAcerca} />
       </View>
 
       <View style={estilos.grupoSalida}>
-        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={cerrarSesion} color={paleta.rojo} />
+        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={() => setCerrando(true)} color={paleta.rojo} />
       </View>
+
+      {/* Confirmación de salida (T013): misma anatomía del diálogo de
+          eliminar de Inicio. Cancelar vuelve, Salir cierra la sesión. */}
+      <Modal visible={cerrando} transparent animationType="fade" onRequestClose={() => setCerrando(false)}>
+        <View style={estilos.fondoDialogo}>
+          <View style={estilos.tarjetaDialogo}>
+            <Text style={[estilos.tituloDialogo, { color: paleta.texto }]}>¿Seguro que quieres salir?</Text>
+            <View style={estilos.botonesDialogo}>
+              <Pressable
+                style={[estilos.botonDialogo, { backgroundColor: paleta.rojo }]}
+                accessibilityRole="button"
+                accessibilityLabel="Salir"
+                onPress={() => {
+                  Vibration.vibrate(10);
+                  void cerrarSesion();
+                }}
+              >
+                <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Salir</Text>
+              </Pressable>
+              <Pressable
+                style={[estilos.botonDialogo, { backgroundColor: paleta.dialogoBoton }]}
+                accessibilityRole="button"
+                accessibilityLabel="Cancelar"
+                onPress={() => setCerrando(false)}
+              >
+                <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -202,9 +223,6 @@ const estilos = StyleSheet.create({
     flex: 1,
   },
   encabezado: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 14,
@@ -212,14 +230,6 @@ const estilos = StyleSheet.create({
   encabezadoTitulo: {
     fontSize: 32,
     fontWeight: '700',
-  },
-  encabezadoSoporte: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  encabezadoSoporteTexto: {
-    fontSize: 17,
   },
   linea: {
     height: StyleSheet.hairlineWidth,
@@ -245,42 +255,28 @@ const estilos = StyleSheet.create({
     fontSize: 42,
     fontWeight: '700',
   },
-  bannerMontado: {
+  chipMontado: {
     position: 'absolute',
-    top: 74,
+    top: 86,
   },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  chip: {
+    borderWidth: 1.5,
+    borderColor: paleta.verdeAccion,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
   },
-  bannerAlaIzquierda: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 15,
-    borderBottomWidth: 15,
-    borderRightWidth: 12,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  bannerCuerpo: {
-    height: 30,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-  },
-  bannerTexto: {
+  chipTexto: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
   },
-  bannerAlaDerecha: {
-    width: 0,
-    height: 0,
-    borderTopWidth: 15,
-    borderBottomWidth: 15,
-    borderLeftWidth: 12,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
+  anillo: {
+    borderWidth: 2.5,
+    borderColor: paleta.verdeAccion,
+    borderRadius: 55,
+    padding: 3,
   },
   perfilTextos: {
     alignItems: 'center',
@@ -294,11 +290,6 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     marginTop: 4,
   },
-  perfilChevron: {
-    position: 'absolute',
-    right: 20,
-    top: 60,
-  },
   grupo: {
     marginTop: 24,
   },
@@ -306,12 +297,52 @@ const estilos = StyleSheet.create({
     marginTop: 40,
     paddingBottom: 8,
   },
+  fondoDialogo: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 24,
+  },
+  tarjetaDialogo: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: paleta.tarjeta,
+    borderRadius: 16,
+    padding: 20,
+  },
+  tituloDialogo: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  botonesDialogo: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+  botonDialogo: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  botonDialogoTexto: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
   fila: {
+    backgroundColor: paleta.tarjeta,
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  filaInterna: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
   },
   filaEtiqueta: {
     flex: 1,

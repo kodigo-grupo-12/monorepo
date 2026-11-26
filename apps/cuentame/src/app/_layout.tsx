@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { ProveedorSesion, useSesion } from '../sesion/ProveedorSesion';
+import { ProveedorAjustes } from '../ajustes/ProveedorAjustes';
 import { ProveedorSplash } from '../splash/SplashActivo';
 import { PantallaSplash } from '../splash/PantallaSplash';
 import { paleta } from '../tema/colores';
@@ -60,7 +61,9 @@ function Recorrido() {
 export default function DisposicionRaiz() {
   return (
     <ProveedorSesion>
-      <Recorrido />
+      <ProveedorAjustes>
+        <Recorrido />
+      </ProveedorAjustes>
     </ProveedorSesion>
   );
 }

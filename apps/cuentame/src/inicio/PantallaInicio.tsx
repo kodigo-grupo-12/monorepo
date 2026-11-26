@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Vibration,
   Text,
   View,
 } from 'react-native';
@@ -24,6 +25,11 @@ import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccio
 import { IconoCartera } from '../carteras/IconoCartera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { MESES, aISO, deISO } from '../transacciones/fechas';
+import { mostrarAviso } from '../avisos/avisos';
+import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
+import { ContadorAnimado } from '../animaciones/ContadorAnimado';
+import { Esqueleto } from '../animaciones/Esqueleto';
+import { useAjustes } from '../ajustes/ProveedorAjustes';
 
 type Periodo = 'semana' | 'mes';
 
@@ -35,7 +41,7 @@ const controladorNativo = Platform.OS !== 'web';
 export function PantallaInicio() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
-  const { transacciones, cargando } = useTransacciones();
+  const { transacciones, cargando, error } = useTransacciones();
   const { categorias } = useCategorias();
   const { carteras } = useCarteras();
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
@@ -82,10 +88,18 @@ export function PantallaInicio() {
     if (!pendiente?.id || eliminando) {
       return;
     }
+    Vibration.vibrate(10);
     setEliminando(true);
     try {
       await eliminarTransaccion(pendiente.id);
       setPendiente(undefined);
+    } catch (error) {
+      console.error('No se pudo eliminar la transacción:', error);
+      mostrarAviso({
+        mensaje: 'No se pudo eliminar',
+        tipo: 'error',
+        accion: { etiqueta: 'Reintentar', alTocar: () => void confirmarEliminacion() },
+      });
     } finally {
       setEliminando(false);
     }
@@ -202,13 +216,33 @@ export function PantallaInicio() {
   const saldoTexto = (monto: number): string =>
     montosVisibles ? `$ ${monto < 0 ? '-' : ''}${Math.abs(monto).toFixed(2)}` : MONTOS_OCULTOS;
 
+  const { ajustes } = useAjustes();
+
+  // Transición del ojito (T013): al alternar visibilidad, el saldo se
+  // desvanece un instante y vuelve, en lugar de cambiar de golpe. Apagable
+  // con el ajuste de animaciones.
+  const opacidadSaldo = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!ajustes.animaciones) {
+      return;
+    }
+    opacidadSaldo.setValue(0.25);
+    Animated.timing(opacidadSaldo, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }, [montosVisibles, ajustes.animaciones, opacidadSaldo]);
+
   return (
     <View style={[estilos.contenedor, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
       <ScrollView contentContainerStyle={estilos.lista}>
+        {/* Estado de sincronización (T013): una línea discreta encima del
+            saldo que dice si los datos están al día o se reintentan. */}
+        <BannerSincronizacion visible={!cargando} sincronizado={!error} />
+
         {/* Header: saldo real de hoy con el ojito a la derecha y Balance
             total debajo. SIN lupa y SIN campana (fuera por tiempo). */}
         <View style={estilos.encabezado}>
-          <Text style={[estilos.saldo, { color: paleta.texto }]}>{saldoTexto(saldoTotal)}</Text>
+          <Animated.View style={{ opacity: opacidadSaldo }}>
+            <ContadorAnimado valor={saldoTotal} formatear={saldoTexto} estilo={[estilos.saldo, { color: paleta.texto }]} />
+          </Animated.View>
           <Pressable
             style={estilos.ojitoBoton}
             accessibilityRole="button"
@@ -269,9 +303,11 @@ export function PantallaInicio() {
 
         <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
           <ToggleSegmentado valor={periodoGrafico} alCambiar={setPeriodoGrafico} />
-          <Text style={[estilos.graficoTotal, { color: paleta.texto }]}>
-            {montosVisibles ? `$ ${gastoActual.toFixed(2)}` : MONTOS_OCULTOS}
-          </Text>
+          <ContadorAnimado
+            valor={gastoActual}
+            formatear={(n) => (montosVisibles ? `$ ${n.toFixed(2)}` : MONTOS_OCULTOS)}
+            estilo={[estilos.graficoTotal, { color: paleta.texto }]}
+          />
           <View style={estilos.graficoFila}>
             <Text style={[estilos.graficoEtiqueta, { color: paleta.textoSuave }]}>
               Total gastado {periodoGrafico === 'semana' ? 'esta semana' : 'este mes'}
@@ -338,7 +374,18 @@ export function PantallaInicio() {
         {/* Transacciones recientes: las últimas 5 con FilaReciente; el
             nombre resuelve con el mismo mapa de categorías y con el ojito
             oculto el monto pasa a ***** conservando su color. */}
-        {recientes.length > 0 ? (
+        {cargando && recientes.length === 0 ? (
+          <>
+            <View style={estilos.seccionCabecera}>
+              <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>
+                Transacciones recientes
+              </Text>
+            </View>
+            <Esqueleto ancho="100%" alto={64} redondeo={14} margen={4} />
+            <Esqueleto ancho="100%" alto={64} redondeo={14} margen={4} />
+            <Esqueleto ancho="100%" alto={64} redondeo={14} margen={4} />
+          </>
+        ) : recientes.length > 0 ? (
           <>
             <View style={estilos.seccionCabecera}>
               <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>

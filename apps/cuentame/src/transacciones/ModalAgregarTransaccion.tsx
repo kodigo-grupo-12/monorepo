@@ -25,6 +25,7 @@ import { IconoCartera } from '../carteras/IconoCartera';
 import { actualizarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
+import { mostrarAviso } from '../avisos/avisos';
 
 const TOPE_B64 = 700 * 1024;
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -212,7 +213,11 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
           categoria_id: categoriaId,
           cartera_id: carteraId,
         });
+        mostrarAviso({ mensaje: 'Transacción guardada', tipo: 'exito' });
         alCerrar();
+      } catch (error) {
+        console.error('No se pudo actualizar la transacción:', error);
+        mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
       } finally {
         setGuardando(false);
       }
@@ -229,7 +234,11 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
         categoria_id: categoriaId,
         cartera_id: carteraId,
       });
+      mostrarAviso({ mensaje: 'Transacción guardada', tipo: 'exito' });
       alCerrar();
+    } catch (error) {
+      console.error('No se pudo crear la transacción:', error);
+      mostrarAviso({ mensaje: 'No se pudo guardar', tipo: 'error' });
     } finally {
       setGuardando(false);
     }
