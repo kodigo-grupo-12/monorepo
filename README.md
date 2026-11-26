@@ -100,6 +100,18 @@ Para probar los datos por dueño con cuentas falsas, sin tocar producción:
 
 Con la variable encendida la app usa el proyecto `demo-cuentame` y va a los emuladores de Auth (`127.0.0.1:9099`) y Firestore (`127.0.0.1:8080`); el popup de Google deja crear cuentas falsas. Sin la variable, nada cambia: la app apunta al proyecto real. Pages y el CI nunca la definen.
 
+### Scripts de Firestore
+
+Scripts de administración con `firebase-admin` en `scripts/firestore/`. Contra el emulador:
+
+1. `pnpm emuladores` en una terminal.
+2. En otra: `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/firestore/<script>.mjs`.
+
+- `marcar-categorias-produccion.mjs`: pone `global: true` en las 14 categorías de producción; si falta alguna, la crea con id `produccion-<slug>`. Idempotente.
+- `borrar-demo-legado.mjs`: lista los datos sin `uid` de la demo compartida anterior y borra solo con `--confirmar`, en lotes de 500.
+
+Todos se niegan a correr fuera del emulador sin `--produccion`, y `--produccion` solo se usa con la orden explícita de Roberto, desde su máquina y con credenciales de administración (`gcloud auth application-default login`).
+
 ## Estructura
 
 ```

@@ -127,8 +127,12 @@ Imagen opcional de galería, comprimida en el dispositivo y guardada en base64 d
 _Avoid_: recibo, archivo adjunto
 
 **Semillas**:
-Los datos de demostración que pueblan las colecciones vacías: las 14 categorías de producción, la cartera Efectivo y las transacciones de demo (el Salario más los 5 gastos).
+Los datos que la app crea para cada persona al entrar por primera vez: su cartera Efectivo y 6 transacciones de demo, todas con su uid (`sembrarPrimeraEntrada`).
 _Avoid_: datos de prueba, fixtures
+
+**Datos demo legados**:
+Los documentos sin uid de la demo compartida anterior: transacciones, carteras y categorías sin uid que no son de producción. Los lista y borra `scripts/firestore/borrar-demo-legado.mjs`, primero simulando y solo con `--confirmar` de verdad.
+_Avoid_: basura, cleanup, residuos
 
 **Sincronización en tiempo real**:
 Escucha de Firestore (listener) que muestra lo guardado en todos los dispositivos sin recargar.
