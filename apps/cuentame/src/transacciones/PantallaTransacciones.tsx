@@ -25,18 +25,33 @@ const ANCHO_DIA = 62;
 // resumen del día (Entrada azul / Salida roja), encabezado del día y filas
 // de solo lectura con montos coloreados como MoneyLover. Inicio no se toca:
 // editar y eliminar siguen viviendo ahí (ADR-0012).
-export function PantallaTransacciones() {
+// Desde la T012 (#117) la pantalla acepta un día inicial: tocar una barra
+// del gráfico de Inicio empuja /transacciones?dia=YYYY-MM-DD. La tira se
+// estira para contenerlo (ADR-0014).
+// Desde la T012 (#119) también acepta ?categoria= (id o nombre) desde el
+// desglose de Inicio: el chip lo muestra y permite quitarlo.
+export function PantallaTransacciones({
+  diaInicial,
+  categoriaInicial,
+}: { diaInicial?: string; categoriaInicial?: string } = {}) {
   const margenes = useSafeAreaInsets();
   const { transacciones } = useTransacciones();
   const { carteras } = useCarteras();
   const { categorias } = useCategorias();
 
-  // El día que se está viendo arranca en hoy; la tira y el calendario lo
-  // mueven. Sin cartera elegida se ve el Total.
-  const [diaISO, setDiaISO] = useState<string>(hoyISO());
+  // El día que se está viendo arranca en el día pedido (si es válido) o en
+  // hoy; la tira y el calendario lo mueven. Sin cartera elegida se ve el
+  // Total.
+  const [diaISO, setDiaISO] = useState<string>(
+    diaInicial && /^\d{4}-\d{2}-\d{2}$/.test(diaInicial) ? diaInicial : hoyISO(),
+  );
   const [carteraId, setCarteraId] = useState<string>();
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const [selectorAbierto, setSelectorAbierto] = useState(false);
+  // Filtro de categoría (T012, #119): al llegar desde el desglose de
+  // Inicio solo se ven las transacciones de esa categoría. La clave llega
+  // como id o como nombre legado de las semillas de la T006.
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string | undefined>(categoriaInicial);
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   // Saldo real calculado (regla de la T007): nunca se guarda, se agrega en
@@ -62,7 +77,17 @@ export function PantallaTransacciones() {
   const delFiltro = carteraElegida
     ? transacciones.filter((transaccion) => transaccion.cartera_id === carteraElegida.id)
     : transacciones;
-  const delDia = delFiltro.filter((transaccion) => transaccion.fecha === diaISO);
+  const nombreFiltro = categoriaFiltro
+    ? (nombresDeCategoria.get(categoriaFiltro) ?? categoriaFiltro)
+    : undefined;
+  const esDeCategoria = (transaccion: Transaccion): boolean =>
+    !categoriaFiltro ||
+    transaccion.categoria_id === categoriaFiltro ||
+    transaccion.categoria === categoriaFiltro ||
+    (nombreFiltro !== undefined && transaccion.categoria === nombreFiltro);
+  const delDia = delFiltro.filter(
+    (transaccion) => transaccion.fecha === diaISO && esDeCategoria(transaccion),
+  );
   const entrada = delDia
     .filter((transaccion) => transaccion.tipo === 'ingreso')
     .reduce((suma, transaccion) => suma + transaccion.monto, 0);
@@ -178,6 +203,22 @@ export function PantallaTransacciones() {
           <Text style={[estilos.volverHoyTexto, { color: paleta.texto }]}>»»</Text>
         </Pressable>
       </View>
+
+      {nombreFiltro ? (
+        <View style={estilos.filaFiltro}>
+          <Text style={[estilos.chipFiltro, { color: paleta.texto }]} numberOfLines={1}>
+            Filtro: {nombreFiltro}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Quitar filtro de categoría"
+            onPress={() => setCategoriaFiltro(undefined)}
+            hitSlop={6}
+          >
+            <Text style={[estilos.chipQuitar, { color: paleta.rojoMonto }]}>Quitar</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={estilos.resumen}>
         <View style={estilos.filaResumen}>
@@ -334,6 +375,23 @@ function GlifoBilleteraLinea() {
 }
 
 const estilos = StyleSheet.create({
+  filaFiltro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 10,
+  },
+  chipFiltro: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  chipQuitar: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 12,
+  },
   raiz: {
     flex: 1,
   },

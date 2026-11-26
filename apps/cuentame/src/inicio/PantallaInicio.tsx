@@ -24,7 +24,8 @@ import type { Transaccion } from '../datos/transacciones';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { IconoCartera } from '../carteras/IconoCartera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
-import { MESES, aISO, deISO } from '../transacciones/fechas';
+import { aspectoDe } from '../categorias/mapaCategorias';
+import { DIAS_ABREV, MESES, aISO, deISO, hoyISO } from '../transacciones/fechas';
 import { mostrarAviso } from '../avisos/avisos';
 import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 import { ContadorAnimado } from '../animaciones/ContadorAnimado';
@@ -50,15 +51,16 @@ export function PantallaInicio() {
   // privacidad. Estado local de sesión, nunca guardado.
   const [montosVisibles, setMontosVisibles] = useState(true);
   const [periodoGrafico, setPeriodoGrafico] = useState<Periodo>('semana');
-  const [periodoGasto, setPeriodoGasto] = useState<Periodo>('mes');
 
-  // La papelera marca la transacción; el diálogo decide. Cancelar no toca
-  // nada y no hay deshacer (ADR-0012).
+  // La presión larga marca la transacción; el diálogo decide. Cancelar no
+  // toca nada y no hay deshacer (ADR-0012).
   const [pendiente, setPendiente] = useState<Transaccion>();
   const [eliminando, setEliminando] = useState(false);
   // Tocar la fila (fuera de la papelera) abre el modal en modo edición con
-  // el documento precargado (ADR-0012).
+  // el documento precargado (ADR-0012). El mismo modal, sin precarga,
+  // sirve para anotar el primer gasto desde el gráfico vacío (T012, #117).
   const [seleccionada, setSeleccionada] = useState<Transaccion>();
+  const [modalAbierto, setModalAbierto] = useState(false);
 
   // Toast «En desarrollo» (T005), para los enlaces que no construyen
   // pantalla en esta pasada.
@@ -143,6 +145,18 @@ export function PantallaInicio() {
           : total,
       0,
     );
+  // Seguro para gastar hoy (T012, #118): (ingresos del mes − gastos del
+  // mes) ÷ días restantes del mes, contando hoy. Un mes sin movimientos
+  // da $0.00 y un resultado negativo se pisa en cero: nunca se sugiere
+  // gastar dinero que no hay. El último día del mes el divisor es 1.
+  const ahora = new Date();
+  const inicioMesISO = aISO(new Date(ahora.getFullYear(), ahora.getMonth(), 1));
+  const finMesISO = aISO(new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0));
+  const delMes = transacciones.filter((t) => t.fecha >= inicioMesISO && t.fecha <= finMesISO);
+  const ingresosMes = delMes.reduce((total, t) => (t.tipo === 'ingreso' ? total + t.monto : total), 0);
+  const gastosMes = delMes.reduce((total, t) => (t.tipo === 'gasto' ? total + t.monto : total), 0);
+  const diasRestantes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate() - ahora.getDate() + 1;
+  const seguroHoy = Math.max(0, ingresosMes - gastosMes) / diasRestantes;
   // Períodos del gráfico y del Mayor gasto (T010): la semana en curso
   // (lunes a domingo, 7 barras) y el mes en curso (una barra por día). El
   // período anterior es el mismo rango corrido atrás, para el porcentaje.
@@ -184,34 +198,80 @@ export function PantallaInicio() {
     ),
   );
   const topeDia = Math.max(...gastoPorDia, 0);
-  // Sin datos previos el modelo muestra − 0%: mismo tratamiento cuando el
-  // porcentaje da cero.
-  const porcentaje = gastoAnterior > 0 ? Math.round(((gastoActual - gastoAnterior) / gastoAnterior) * 100) : 0;
-  const textoPorcentaje = porcentaje > 0 ? `+ ${porcentaje}%` : `− ${Math.abs(porcentaje)}%`;
+  // Promedio del período para la línea del gráfico (T012, #117).
+  const promedioDia = gastoActual / dias.length;
+  // Delta real (T012, #116): el gasto del período contra el inmediato
+  // anterior de la misma longitud. Si ningún período tiene datos no se
+  // inventa número: el delta simplemente no se muestra. Con el período
+  // anterior vacío y gasto nuevo, el salto real es +100%.
+  const deltaVisible = gastoActual > 0 || gastoAnterior > 0;
+  const porcentaje =
+    gastoAnterior > 0
+      ? Math.round(((gastoActual - gastoAnterior) / gastoAnterior) * 100)
+      : gastoActual > 0
+        ? 100
+        : 0;
+  // Subir el gasto es mala noticia (rojo); bajarlo, buena (verde).
+  const colorDelta = porcentaje > 0 ? paleta.rojoMonto : porcentaje < 0 ? paleta.verdeMonto : paleta.textoSuave;
+  const textoDelta =
+    porcentaje > 0 ? `+${porcentaje}%` : porcentaje < 0 ? `−${Math.abs(porcentaje)}%` : '0%';
+  const etiquetaDelta = `vs. ${periodoGrafico === 'semana' ? 'semana' : 'mes'} anterior`;
 
-  // Mayor gasto: top 3 de categorías por porcentaje del gasto del período.
-  const conjuntoGasto = new Set(diasDe(periodoGasto, new Date()));
+  // Desglose por categoría (T012, #119): top 5 del mes en curso por gasto,
+  // en orden descendente, con monto, barra y porcentaje del total del mes.
+  // Reemplaza el Mayor gasto de la T010. La clave es el id de categoría (o
+  // el nombre legado de las semillas de la T006) y sirve para filtrar
+  // Transacciones al tocar la fila.
+  const conjuntoMesGasto = new Set(diasDe('mes', new Date()));
   const gastoPorCategoria = new Map<string, number>();
   let gastoTotalGasto = 0;
   for (const transaccion of transacciones) {
-    if (transaccion.tipo !== 'gasto' || !conjuntoGasto.has(transaccion.fecha)) {
+    if (transaccion.tipo !== 'gasto' || !conjuntoMesGasto.has(transaccion.fecha)) {
       continue;
     }
     const clave = transaccion.categoria_id ?? transaccion.categoria ?? 'Otros gastos';
     gastoPorCategoria.set(clave, (gastoPorCategoria.get(clave) ?? 0) + transaccion.monto);
     gastoTotalGasto += transaccion.monto;
   }
-  const mayorGasto = [...gastoPorCategoria.entries()]
+  const desglose = [...gastoPorCategoria.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
+    .slice(0, 5)
     .map(([clave, monto]) => ({
+      clave,
       // El lookup va primero sin importar la forma de la clave: los ids de
       // Firestore no llevan guiones y resuelven igual en el mapa.
       nombre: nombresDeCategoria.get(clave) ?? clave,
+      monto,
       porcentaje: gastoTotalGasto > 0 ? Math.round((monto / gastoTotalGasto) * 100) : 0,
     }));
 
   const recientes = transacciones.slice(0, 5);
+
+  // Recientes agrupadas por día (T012, #120): Hoy, Ayer o la fecha
+  // explícita. Los grupos se arman en orden porque la lista ya viene
+  // descendente por fecha.
+  const etiquetaDeDia = (iso: string): string => {
+    if (iso === hoyISO()) {
+      return 'Hoy';
+    }
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    if (iso === aISO(ayer)) {
+      return 'Ayer';
+    }
+    const fecha = deISO(iso);
+    const año = fecha.getFullYear() === new Date().getFullYear() ? '' : ` ${fecha.getFullYear()}`;
+    return `${fecha.getDate()} ${MESES[fecha.getMonth()]}${año}`;
+  };
+  const gruposRecientes: { etiqueta: string; items: Transaccion[] }[] = [];
+  for (const reciente of recientes) {
+    const ultimo = gruposRecientes[gruposRecientes.length - 1];
+    if (ultimo && ultimo.items[0].fecha === reciente.fecha) {
+      ultimo.items.push(reciente);
+    } else {
+      gruposRecientes.push({ etiqueta: etiquetaDeDia(reciente.fecha), items: [reciente] });
+    }
+  }
 
   const saldoTexto = (monto: number): string =>
     montosVisibles ? `$ ${monto < 0 ? '-' : ''}${Math.abs(monto).toFixed(2)}` : MONTOS_OCULTOS;
@@ -255,6 +315,22 @@ export function PantallaInicio() {
           </Pressable>
         </View>
         <Text style={[estilos.balanceTexto, { color: paleta.textoSuave }]}>Balance total</Text>
+
+        {/* Seguro para gastar hoy (T012, #118): lo que cabe gastar hoy sin
+            descuadrar el mes, estilo PocketGuard. El ojito lo enmascara
+            con el mismo criterio que el saldo. */}
+        <View style={estilos.seguro}>
+          <GlifoEscudo />
+          <View style={estilos.seguroTextos}>
+            <Text style={[estilos.seguroTitulo, { color: paleta.texto }]} numberOfLines={1}>
+              Seguro para gastar hoy
+            </Text>
+            <Text style={[estilos.seguroCaption, { color: paleta.textoSuave }]}>
+              Ingresos del mes menos gastos, entre los días que faltan
+            </Text>
+          </View>
+          <Text style={[estilos.seguroMonto, { color: paleta.texto }]}>{saldoTexto(seguroHoy)}</Text>
+        </View>
 
         {/* Tarjeta Mis carteras: una fila por cartera con su icono, nombre
             y saldo. Ver todo navega a la pantalla Mis carteras de Cuenta
@@ -312,41 +388,87 @@ export function PantallaInicio() {
             <Text style={[estilos.graficoEtiqueta, { color: paleta.textoSuave }]}>
               Total gastado {periodoGrafico === 'semana' ? 'esta semana' : 'este mes'}
             </Text>
-            <Text style={[estilos.graficoPorcentaje, { color: paleta.amarilloCambio }]}>
-              {textoPorcentaje}
-            </Text>
+            {deltaVisible ? (
+              <>
+                <Text style={[estilos.graficoPorcentaje, { color: colorDelta }]}>
+                  {montosVisibles ? textoDelta : MONTOS_OCULTOS}
+                </Text>
+                <Text style={[estilos.deltaEtiqueta, { color: paleta.textoSuave }]}>{etiquetaDelta}</Text>
+              </>
+            ) : null}
           </View>
-          {/* Vacío, como en el modelo: barras fantasma y el texto de
-              invitación. Con datos, una barra verde por día. */}
+          {/* Vacío (T012, #117): el cerdito y la invitación a anotar el
+              primer gasto; nunca barras fantasma que parezcan datos. Con
+              datos, una barra por día: la de hoy en verde, el resto en
+              gris, y el promedio del período marcado con línea. Tocar una
+              barra abre Transacciones en ese día. */}
           {gastoActual === 0 ? (
             <View style={estilos.graficoVacio}>
-              <View style={estilos.graficoFantasmas}>
-                <View style={[estilos.graficoFantasma, { backgroundColor: paleta.barraFantasma }]} />
-                <View style={[estilos.graficoFantasma, { backgroundColor: paleta.barraFantasma }]} />
-              </View>
+              <GlifoCerdito />
               <Text style={[estilos.graficoVacioTexto, { color: paleta.textoSuave }]}>
-                Introduzca las transacciones para ver el informe
+                Sin gastos {periodoGrafico === 'semana' ? 'esta semana' : 'este mes'}
               </Text>
+              <Pressable
+                style={estilos.botonCerdito}
+                accessibilityRole="button"
+                accessibilityLabel="Anota tu primer gasto"
+                onPress={() => setModalAbierto(true)}
+              >
+                <Text style={estilos.botonCerditoTexto}>Anota tu primer gasto</Text>
+              </Pressable>
             </View>
           ) : (
-            <View style={estilos.graficoBarras}>
-              {gastoPorDia.map((gasto, indice) => (
-                <View
-                  key={dias[indice]}
-                  style={[
-                    estilos.graficoBarra,
-                    { height: topeDia > 0 ? Math.max(3, (gasto / topeDia) * 72) : 3, backgroundColor: paleta.verdeAccion },
-                  ]}
-                />
-              ))}
+            <View>
+              <View style={estilos.graficoBarras}>
+                {gastoPorDia.map((gasto, indice) => {
+                  const iso = dias[indice];
+                  return (
+                    <Pressable
+                      key={iso}
+                      style={estilos.graficoBarraZona}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Gastos del día ${iso}`}
+                      onPress={() => enrutador.push(`/transacciones?dia=${iso}`)}
+                    >
+                      <View
+                        style={[
+                          estilos.graficoBarra,
+                          {
+                            height: topeDia > 0 ? Math.max(3, (gasto / topeDia) * 72) : 3,
+                            backgroundColor: iso === hoyISO() ? paleta.verdeAccion : paleta.puntoInactivo,
+                          },
+                        ]}
+                      />
+                      {periodoGrafico === 'semana' ? (
+                        <Text style={[estilos.graficoInicial, { color: paleta.textoSuave }]}>
+                          {DIAS_ABREV[deISO(iso).getDay()][0]}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+                {topeDia > 0 ? (
+                  <View
+                    style={[
+                      estilos.graficoPromedio,
+                      { bottom: (promedioDia / topeDia) * 72, borderTopColor: paleta.textoSuave },
+                    ]}
+                  />
+                ) : null}
+              </View>
+              <Text style={[estilos.graficoPromedioTexto, { color: paleta.textoSuave }]}>
+                Promedio {montosVisibles ? `$ ${promedioDia.toFixed(2)}` : MONTOS_OCULTOS}
+              </Text>
             </View>
           )}
         </View>
 
-        {/* Mayor gasto: top 3 de categorías con glifo y color del mapa fijo
-            de la T007 y porcentaje en rojo. Ver detalles es toast. */}
+        {/* Desglose por categoría (T012, #119): top 5 del mes con glifo y
+            color del mapa fijo de la T007, monto, barra y porcentaje. Tocar
+            una categoría abre Transacciones filtrada por ella; Ver detalles
+            sigue siendo toast (T005). El ojito oculta los montos. */}
         <View style={estilos.seccionCabecera}>
-          <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>Mayor gasto</Text>
+          <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>Desglose por categoría</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Ver detalles"
@@ -358,17 +480,37 @@ export function PantallaInicio() {
         </View>
 
         <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
-          <ToggleSegmentado valor={periodoGasto} alCambiar={setPeriodoGasto} />
-          {mayorGasto.map((entrada) => (
-            <View key={entrada.nombre} style={estilos.filaGasto}>
-              <GlifoCategoria nombre={entrada.nombre} />
-              <Text style={[estilos.nombreGasto, { color: paleta.texto }]} numberOfLines={1}>
-                {entrada.nombre}
-              </Text>
-              <Text style={[estilos.porcentajeGasto, { color: paleta.rojoMonto }]}>
-                {entrada.porcentaje}%
-              </Text>
-            </View>
+          {desglose.map((entrada) => (
+            <Pressable
+              key={entrada.clave}
+              accessibilityRole="button"
+              accessibilityLabel={`Transacciones de ${entrada.nombre}`}
+              onPress={() => enrutador.push(`/transacciones?categoria=${encodeURIComponent(entrada.clave)}`)}
+            >
+              <View style={estilos.filaGasto}>
+                <GlifoCategoria nombre={entrada.nombre} />
+                <Text style={[estilos.nombreGasto, { color: paleta.texto }]} numberOfLines={1}>
+                  {entrada.nombre}
+                </Text>
+                <Text style={[estilos.montoGasto, { color: paleta.texto }]}>
+                  {saldoTexto(entrada.monto)}
+                </Text>
+                <Text style={[estilos.porcentajeGasto, { color: paleta.textoSuave }]}>
+                  {entrada.porcentaje}%
+                </Text>
+              </View>
+              <View style={estilos.barraGastoPista}>
+                <View
+                  style={[
+                    estilos.barraGasto,
+                    {
+                      width: `${Math.min(100, entrada.porcentaje)}%`,
+                      backgroundColor: aspectoDe(entrada.nombre).color,
+                    },
+                  ]}
+                />
+              </View>
+            </Pressable>
           ))}
         </View>
         {/* Transacciones recientes: las últimas 5 con FilaReciente; el
@@ -391,21 +533,36 @@ export function PantallaInicio() {
               <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>
                 Transacciones recientes
               </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ver todo, Transacciones"
+                onPress={() => enrutador.push('/transacciones')}
+                hitSlop={6}
+              >
+                <Text style={[estilos.enlace, { color: paleta.verdeAccion }]}>Ver todo</Text>
+              </Pressable>
             </View>
             <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
-              {recientes.map((reciente) => (
-                <FilaReciente
-                  key={reciente.id ?? `${reciente.fecha}-${reciente.monto}`}
-                  transaccion={reciente}
-                  nombreCategoria={
-                    reciente.categoria_id
-                      ? nombresDeCategoria.get(reciente.categoria_id)
-                      : undefined
-                  }
-                  montosVisibles={montosVisibles}
-                  alEditar={() => setSeleccionada(reciente)}
-                  alEliminar={() => setPendiente(reciente)}
-                />
+              {gruposRecientes.map((grupo) => (
+                <View key={grupo.etiqueta}>
+                  <Text style={[estilos.grupoReciente, { color: paleta.textoSuave }]}>
+                    {grupo.etiqueta}
+                  </Text>
+                  {grupo.items.map((reciente) => (
+                    <FilaReciente
+                      key={reciente.id ?? `${reciente.fecha}-${reciente.monto}`}
+                      transaccion={reciente}
+                      nombreCategoria={
+                        reciente.categoria_id
+                          ? nombresDeCategoria.get(reciente.categoria_id)
+                          : undefined
+                      }
+                      montosVisibles={montosVisibles}
+                      alEditar={() => setSeleccionada(reciente)}
+                      alEliminar={() => setPendiente(reciente)}
+                    />
+                  ))}
+                </View>
               ))}
             </View>
           </>
@@ -465,8 +622,11 @@ export function PantallaInicio() {
       </Modal>
 
       <ModalAgregarTransaccion
-        visible={!!seleccionada}
-        alCerrar={() => setSeleccionada(undefined)}
+        visible={modalAbierto || !!seleccionada}
+        alCerrar={() => {
+          setModalAbierto(false);
+          setSeleccionada(undefined);
+        }}
         transaccion={seleccionada}
       />
     </View>
@@ -518,10 +678,38 @@ function GlifoOjo() {
   );
 }
 
-// Fila de Transacciones recientes: círculo con glifo y color de la
-// categoría (mapa fijo T007), título = categoría, subtítulo = fecha de la
-// transacción y monto coloreado como MoneyLover (ingresos azul, gastos
-// rojo). Con el ojito oculto el monto pasa a ***** conservando su color.
+// Cerdito dibujado con vistas (T012, #117): el estado vacío del gráfico
+// invita a anotar el primer gasto en vez de fingir barras. Mismo criterio
+// del repo: sin dependencias nuevas, nada pedido por URL.
+function GlifoCerdito() {
+  return (
+    <View style={estilos.cerdito}>
+      <View style={[estilos.cerditoCuerpo, { borderColor: paleta.verdeAccion }]} />
+      <View style={[estilos.cerditoRanura, { backgroundColor: paleta.verdeAccion }]} />
+      <View style={[estilos.cerditoHocico, { backgroundColor: paleta.verdeAccion }]} />
+      <View style={[estilos.cerditoPata, { backgroundColor: paleta.verdeAccion, left: 14 }]} />
+      <View style={[estilos.cerditoPata, { backgroundColor: paleta.verdeAccion, right: 14 }]} />
+    </View>
+  );
+}
+
+// Escudo dibujado con vistas (T012, #118): mismo criterio del repo, sin
+// dependencias nuevas y nada pedido por URL.
+function GlifoEscudo() {
+  return (
+    <View style={estilos.escudo}>
+      <View style={[estilos.escudoCuerpo, { backgroundColor: paleta.verdeAccion }]} />
+      <View style={[estilos.escudoPunta, { borderTopColor: paleta.verdeAccion }]} />
+    </View>
+  );
+}
+
+// Fila de Transacciones recientes (T012, #120): círculo con glifo y color
+// de la categoría (mapa fijo T007), título = categoría, subtítulo = fecha
+// y monto coloreado como MoneyLover (ingresos azul, gastos rojo). Tocar
+// edita (ADR-0012) y la presión larga abre el diálogo de eliminar: la
+// papelera expuesta del ADR-0012 queda revocada en Inicio. Con el ojito
+// oculto el monto pasa a ***** conservando su color.
 function FilaReciente({
   transaccion,
   nombreCategoria,
@@ -537,60 +725,35 @@ function FilaReciente({
 }) {
   const fecha = deISO(transaccion.fecha);
 
-  // En web cada Pressable es un <button>. La papelera va como hermana de
-  // la zona de edición, no adentro: un botón HTML no puede anidar otro.
+  // Un solo Pressable: en web cada Pressable es un <button> y no puede
+  // anidar otro, así que la papelera expuesta también estorbaba ahí.
   return (
-    <View style={estilos.filaReciente}>
-      <Pressable
-        style={estilos.cuerpoReciente}
-        accessibilityRole="button"
-        accessibilityLabel="Editar transacción"
-        onPress={alEditar}
-      >
-        <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
-        <View style={estilos.detallesReciente}>
-          <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
-            {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
-          </Text>
-          <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
-            {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
-          </Text>
-        </View>
-        <Text
-          style={[
-            estilos.montoReciente,
-            { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
-          ]}
-        >
-          {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
+    <Pressable
+      style={estilos.filaReciente}
+      accessibilityRole="button"
+      accessibilityLabel="Editar transacción"
+      accessibilityHint="Mantén presionado para eliminar"
+      onPress={alEditar}
+      onLongPress={alEliminar}
+    >
+      <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
+      <View style={estilos.detallesReciente}>
+        <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
+          {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
         </Text>
-      </Pressable>
-      <Pressable
-        style={estilos.papeleraReciente}
-        accessibilityRole="button"
-        accessibilityLabel="Eliminar transacción"
-        onPress={alEliminar}
-        hitSlop={6}
+        <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
+          {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
+        </Text>
+      </View>
+      <Text
+        style={[
+          estilos.montoReciente,
+          { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
+        ]}
       >
-        <GlifoPapelera />
-      </Pressable>
-    </View>
-  );
-}
-
-// Papelera dibujada con vistas, como quedó en la T004: Expo SDK 58 ya no
-// trae un set de iconos y no se agrega ninguna dependencia nueva.
-function GlifoPapelera() {
-  const verde = paleta.verdeAccion;
-
-  return (
-    <View style={estilos.papelera}>
-      <View style={[estilos.papeleraAsa, { backgroundColor: verde }]} />
-      <View style={[estilos.papeleraTapa, { backgroundColor: verde }]} />
-      <View style={[estilos.papeleraCuerpo, { borderColor: verde }]} />
-      <View style={[estilos.papeleraLinea, { backgroundColor: verde, left: 7 }]} />
-      <View style={[estilos.papeleraLinea, { backgroundColor: verde, left: 11 }]} />
-    </View>
+        {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -641,6 +804,56 @@ const estilos = StyleSheet.create({
   balanceTexto: {
     fontSize: 15,
     marginTop: 2,
+  },
+  seguro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: paleta.verdeAccion,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  seguroTextos: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  seguroTitulo: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  seguroCaption: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  seguroMonto: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    marginLeft: 10,
+  },
+  escudo: {
+    width: 16,
+    alignItems: 'center',
+  },
+  escudoCuerpo: {
+    width: 16,
+    height: 12,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  escudoPunta: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
   },
   tarjeta: {
     borderRadius: 16,
@@ -727,24 +940,69 @@ const estilos = StyleSheet.create({
   graficoPorcentaje: {
     fontSize: 16,
     fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  deltaEtiqueta: {
+    fontSize: 13,
+    marginLeft: 6,
   },
   graficoVacio: {
     alignItems: 'center',
     marginTop: 16,
   },
-  graficoFantasmas: {
-    flexDirection: 'row',
-    gap: 26,
-  },
-  graficoFantasma: {
-    width: 100,
-    height: 64,
-    borderRadius: 16,
-  },
   graficoVacioTexto: {
     fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
+  },
+  botonCerdito: {
+    marginTop: 14,
+    backgroundColor: paleta.verdeAccion,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  botonCerditoTexto: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  cerdito: {
+    width: 56,
+    height: 44,
+    marginTop: 10,
+  },
+  cerditoCuerpo: {
+    position: 'absolute',
+    left: 2,
+    top: 8,
+    width: 50,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  cerditoRanura: {
+    position: 'absolute',
+    top: 4,
+    left: 20,
+    width: 14,
+    height: 3,
+    borderRadius: 1.5,
+  },
+  cerditoHocico: {
+    position: 'absolute',
+    top: 18,
+    right: 0,
+    width: 12,
+    height: 10,
+    borderRadius: 6,
+  },
+  cerditoPata: {
+    position: 'absolute',
+    bottom: 0,
+    width: 6,
+    height: 6,
+    borderRadius: 2,
   },
   graficoBarras: {
     flexDirection: 'row',
@@ -752,11 +1010,31 @@ const estilos = StyleSheet.create({
     gap: 4,
     height: 76,
     marginTop: 16,
+    position: 'relative',
+  },
+  graficoBarraZona: {
+    flex: 1,
+    alignItems: 'center',
   },
   graficoBarra: {
-    flex: 1,
+    alignSelf: 'stretch',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
+  },
+  graficoInicial: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  graficoPromedio: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    borderStyle: 'dashed',
+  },
+  graficoPromedioTexto: {
+    fontSize: 12,
+    marginTop: 6,
   },
   filaGasto: {
     flexDirection: 'row',
@@ -768,20 +1046,37 @@ const estilos = StyleSheet.create({
     fontSize: 17,
     marginLeft: 12,
   },
+  montoGasto: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    marginLeft: 8,
+  },
   porcentajeGasto: {
     fontSize: 17,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
+  barraGastoPista: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: paleta.barraFantasma,
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  barraGasto: {
+    height: 4,
+    borderRadius: 2,
+  },
+  grupoReciente: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 14,
+  },
   filaReciente: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 14,
-  },
-  cuerpoReciente: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 10,
   },
   detallesReciente: {
     flex: 1,
@@ -795,53 +1090,10 @@ const estilos = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  papeleraReciente: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   montoReciente: {
     fontSize: 16,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-  },
-  papelera: {
-    width: 20,
-    height: 22,
-  },
-  papeleraAsa: {
-    position: 'absolute',
-    top: 0,
-    left: 7,
-    width: 6,
-    height: 2,
-    borderRadius: 1,
-  },
-  papeleraTapa: {
-    position: 'absolute',
-    top: 3,
-    left: 0,
-    width: 20,
-    height: 2,
-    borderRadius: 1,
-  },
-  papeleraCuerpo: {
-    position: 'absolute',
-    top: 6,
-    left: 3,
-    width: 14,
-    height: 14,
-    borderWidth: 2,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-  },
-  papeleraLinea: {
-    position: 'absolute',
-    top: 9,
-    width: 2,
-    height: 7,
   },
   fondoDialogo: {
     flex: 1,
