@@ -80,6 +80,36 @@ export function estaAbierto(estado: EstadoCompromiso): boolean {
   return estado === 'activo' || estado === 'vencido';
 }
 
+// 0: ya venció, 1: tiene fecha futura, 2: sin fecha. Con esto la lista va
+// vencidos primero, luego por vence ascendente y al final los sin fecha.
+function grupoDeVencimiento(compromiso: Compromiso, hoy: string): number {
+  if (!compromiso.vence) {
+    return 2;
+  }
+  return compromiso.vence <= hoy ? 0 : 1;
+}
+
+export function ordenarParaLista(
+  compromisos: Compromiso[],
+  transacciones: Transaccion[],
+  hoy: string,
+): Compromiso[] {
+  return compromisos
+    .filter((c) => estaAbierto(estadoDe(c, transacciones, hoy)))
+    .slice()
+    .sort((a, b) => {
+      const grupoA = grupoDeVencimiento(a, hoy);
+      const grupoB = grupoDeVencimiento(b, hoy);
+      if (grupoA !== grupoB) {
+        return grupoA - grupoB;
+      }
+      if (grupoA < 2 && a.vence !== b.vence) {
+        return a.vence! < b.vence! ? -1 : 1;
+      }
+      return a.fecha > b.fecha ? -1 : a.fecha < b.fecha ? 1 : 0;
+    });
+}
+
 export function resumenCompromisos(
   compromisos: Compromiso[],
   transacciones: Transaccion[],

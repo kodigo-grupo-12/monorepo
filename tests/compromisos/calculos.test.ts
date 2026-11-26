@@ -7,6 +7,7 @@ import {
   esMovimientoReal,
   notaDeAbono,
   notaDeOrigen,
+  ordenarParaLista,
   estaAbierto,
   estadoDe,
   pendienteDe,
@@ -141,5 +142,18 @@ describe('notas de origen y abono', () => {
     expect(notaDeOrigen({ direccion: 'debo', contraparte: 'Ana' })).toBe('Préstamo de Ana');
     expect(notaDeAbono({ direccion: 'me_deben', contraparte: 'Juan' })).toBe('Cobro de Juan');
     expect(notaDeAbono({ direccion: 'debo', contraparte: 'Ana' })).toBe('Pago a Ana');
+  });
+});
+
+describe('ordenarParaLista', () => {
+  it('vencidos primero, después vence ascendente, sin vence al final por fecha descendente y deja fuera los cerrados', () => {
+    const juan = compromiso({ id: 'juan', monto: 50, vence: '2026-11-20', fecha: '2026-11-01' });
+    const pedro = compromiso({ id: 'pedro', monto: 10, fecha: '2026-11-05' });
+    const ana = compromiso({ id: 'ana', direccion: 'debo', monto: 30, fecha: '2026-11-10' });
+    const luis = compromiso({ id: 'luis', monto: 12, vence: '2026-12-01', fecha: '2026-11-02' });
+    const viejo = compromiso({ id: 'viejo', monto: 8, vence: '2026-11-01', fecha: '2026-11-03' });
+    const cerrado = compromiso({ id: 'cerrado', monto: 15, cierre: 'perdonado' });
+    const orden = ordenarParaLista([pedro, ana, luis, cerrado, juan, viejo], [], HOY);
+    expect(orden.map((c) => c.id)).toEqual(['viejo', 'juan', 'luis', 'ana', 'pedro']);
   });
 });
