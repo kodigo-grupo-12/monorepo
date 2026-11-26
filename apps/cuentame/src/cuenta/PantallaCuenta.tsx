@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Presionable } from '../animaciones/Presionable';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -103,16 +104,19 @@ function Fila({
   color?: string;
 }) {
   return (
-    <Pressable
+    <Presionable
       style={estilos.fila}
       accessibilityRole="button"
       accessibilityLabel={etiqueta}
       onPress={alTocar}
+      estiloContenido={{ flex: 1 }}
     >
-      {icono}
-      <Text style={[estilos.filaEtiqueta, { color }]}>{etiqueta}</Text>
-      <IconoChevron />
-    </Pressable>
+      <View style={estilos.filaInterna}>
+        {icono}
+        <Text style={[estilos.filaEtiqueta, { color }]}>{etiqueta}</Text>
+        <IconoChevron />
+      </View>
+    </Presionable>
   );
 }
 
@@ -312,11 +316,13 @@ const estilos = StyleSheet.create({
     paddingBottom: 8,
   },
   fila: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  filaInterna: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
   },
   filaEtiqueta: {
     flex: 1,
