@@ -8,6 +8,8 @@ import {
   notaDeAbono,
   notaDeOrigen,
   ordenarParaLista,
+  datosDeAbono,
+  validarAbono,
   estaAbierto,
   estadoDe,
   pendienteDe,
@@ -155,5 +157,60 @@ describe('ordenarParaLista', () => {
     const cerrado = compromiso({ id: 'cerrado', monto: 15, cierre: 'perdonado' });
     const orden = ordenarParaLista([pedro, ana, luis, cerrado, juan, viejo], [], HOY);
     expect(orden.map((c) => c.id)).toEqual(['viejo', 'juan', 'luis', 'ana', 'pedro']);
+  });
+});
+
+describe('datosDeAbono', () => {
+  it('arma los 4 casos exactos: neutral solo en dinero, categoria solo en compra y nota de abono', () => {
+    const cobro = compromiso({ monto: 50, naturaleza: 'dinero' });
+    const cobroDatos = datosDeAbono(cobro, { monto: 20, fecha: '2026-11-26', cartera_id: 'efectivo' });
+    expect(cobroDatos).toMatchObject({
+      rol: 'abono',
+      compromiso_id: 'c1',
+      monto: 20,
+      fecha: '2026-11-26',
+      cartera_id: 'efectivo',
+      tipo: 'ingreso',
+      neutral: true,
+    });
+    expect(cobroDatos.categoria_id).toBeUndefined();
+    expect(cobroDatos.nota).toBe('Cobro de Juan');
+
+    const pago = compromiso({ monto: 30, direccion: 'debo', naturaleza: 'dinero', contraparte: 'Ana' });
+    const pagoDatos = datosDeAbono(pago, { monto: 5, fecha: '2026-11-26', cartera_id: 'efectivo' });
+    expect(pagoDatos).toMatchObject({ tipo: 'gasto', neutral: true, rol: 'abono', compromiso_id: 'c1' });
+    expect(pagoDatos.categoria_id).toBeUndefined();
+    expect(pagoDatos.nota).toBe('Pago a Ana');
+
+    const compraDebo = compromiso({ monto: 600, direccion: 'debo', naturaleza: 'compra', categoria_id: 'cat-compras' });
+    const pagoCompra = datosDeAbono(compraDebo, { monto: 20, fecha: '2026-11-26', cartera_id: 'tarjeta' });
+    expect(pagoCompra).toMatchObject({ tipo: 'gasto', rol: 'abono', categoria_id: 'cat-compras' });
+    expect(pagoCompra.neutral).toBeUndefined();
+
+    const compraMio = compromiso({ monto: 200, naturaleza: 'compra', categoria_id: 'cat-compras' });
+    const cobroCompra = datosDeAbono(compraMio, {
+      monto: 10,
+      fecha: '2026-11-26',
+      cartera_id: 'efectivo',
+      categoria_id: 'cat-otra',
+      nota: 'me dio algo',
+    });
+    expect(cobroCompra).toMatchObject({ tipo: 'ingreso', categoria_id: 'cat-otra', nota: 'me dio algo' });
+    expect(cobroCompra.neutral).toBeUndefined();
+  });
+
+  it('con una compra sin categoria lanza', () => {
+    const compraSinCategoria = compromiso({ monto: 600, direccion: 'debo', naturaleza: 'compra' });
+    expect(() =>
+      datosDeAbono(compraSinCategoria, { monto: 20, fecha: '2026-11-26', cartera_id: 'tarjeta' }),
+    ).toThrow('Falta la categoría');
+  });
+});
+
+describe('validarAbono', () => {
+  it('excede, ok y cero, comparado en centavos', () => {
+    expect(validarAbono(30.01, 30)).toBe('excede');
+    expect(validarAbono(30, 30)).toBe('ok');
+    expect(validarAbono(0, 30)).toBe('cero');
   });
 });

@@ -3,6 +3,7 @@
 // con las transacciones que la persona ya escucha (ADR-0019). Todo se suma
 // en centavos enteros y se devuelve en dólares.
 import type { Compromiso } from '../datos/compromisos';
+import type { DatosNuevaTransaccion } from '../datos/consultas';
 import type { Transaccion } from '../datos/transacciones';
 
 export function notaDeOrigen(compromiso: Pick<Compromiso, 'direccion' | 'contraparte'>): string {
@@ -108,6 +109,54 @@ export function ordenarParaLista(
       }
       return a.fecha > b.fecha ? -1 : a.fecha < b.fecha ? 1 : 0;
     });
+}
+
+export interface DatosAbono {
+  monto: number;
+  fecha: string;
+  cartera_id: string;
+  categoria_id?: string;
+  nota?: string;
+}
+
+// Arma la transacción de un abono (#134): la de dinero mueve la cartera sin
+// contar como gasto ni ingreso (neutral) y la de compra sí cuenta, con su
+// categoría obligatoria (la del abono o la del compromiso).
+export function datosDeAbono(compromiso: Compromiso, abono: DatosAbono): DatosNuevaTransaccion {
+  const compra = compromiso.naturaleza === 'compra';
+  if (compra && !abono.categoria_id && !compromiso.categoria_id) {
+    throw new Error('Falta la categoría');
+  }
+  return {
+    compromiso_id: compromiso.id,
+    rol: 'abono',
+    monto: abono.monto,
+    fecha: abono.fecha,
+    cartera_id: abono.cartera_id,
+    nota: abono.nota || notaDeAbono(compromiso),
+    ...(compra
+      ? {
+          categoria_id: abono.categoria_id ?? compromiso.categoria_id,
+          tipo: (compromiso.direccion === 'debo' ? 'gasto' : 'ingreso') as DatosNuevaTransaccion['tipo'],
+        }
+      : {
+          tipo: (compromiso.direccion === 'me_deben' ? 'ingreso' : 'gasto') as DatosNuevaTransaccion['tipo'],
+          neutral: true,
+        }),
+  };
+}
+
+// El abono no puede pasar del pendiente ni ser cero, comparado en centavos.
+export function validarAbono(monto: number, pendiente: number): 'ok' | 'cero' | 'excede' {
+  const centavos = Math.round(monto * 100);
+  const centavosPendiente = Math.round(pendiente * 100);
+  if (centavos <= 0) {
+    return 'cero';
+  }
+  if (centavos > centavosPendiente) {
+    return 'excede';
+  }
+  return 'ok';
 }
 
 export function resumenCompromisos(

@@ -4,6 +4,8 @@
 import { collection } from 'firebase/firestore';
 
 import { armarBatchCompromiso, COLECCION_COMPROMISOS, type DatosNuevoCompromiso } from './consultas';
+import { datosDeAbono, type DatosAbono } from '../compromisos/calculos';
+import { crearTransaccion } from './transacciones';
 import { db } from './firebase';
 import { uidDeSesion } from '../sesion/auth';
 
@@ -18,6 +20,12 @@ export async function crearCompromiso(
   const { batch, id } = armarBatchCompromiso(db, datos, uidDeSesion(), origen);
   await batch.commit();
   return id;
+}
+
+// Registra un cobro o un pago (#134): escribe la transacción de abono
+// amarrada al compromiso con los datos calculados en compromisos/calculos.
+export async function registrarAbono(compromiso: Compromiso, abono: DatosAbono): Promise<string> {
+  return crearTransaccion(datosDeAbono(compromiso, abono));
 }
 
 export type Direccion = 'me_deben' | 'debo';

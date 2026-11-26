@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -6,10 +7,10 @@ import { Esqueleto } from '../animaciones/Esqueleto';
 import { useCarteras } from '../datos/useCarteras';
 import { useCompromisos } from '../datos/useCompromisos';
 import { useTransacciones } from '../datos/useTransacciones';
-import { Pressable } from 'react-native';
 import { deISO, hoyISO } from '../transacciones/fechas';
 import { paleta } from '../tema/colores';
 import { abonadoDe, abonosDe, diasDeAtraso, estadoDe, pendienteDe } from './calculos';
+import { ModalAbono } from './ModalAbono';
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -29,6 +30,7 @@ function diaLargo(iso: string): string {
 // Detalle de un compromiso (spec #130, issue #133): todo en vivo, sin
 // escribir nada. Los botones llegan en #134, #135 y #137.
 export function PantallaDetalleCompromiso({ id }: { id: string }) {
+  const [modalAbono, setModalAbono] = useState(false);
   const margenes = useSafeAreaInsets();
   const enrutador = useRouter();
   const { compromisos, cargando } = useCompromisos();
@@ -88,6 +90,7 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
     : undefined;
   const abonos = abonosDe(compromiso.id ?? '', transacciones).slice().reverse();
   const vencido = estado === 'vencido';
+  const abierto = estado === 'activo' || estado === 'vencido';
 
   return (
     <View style={[estilos.raiz, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
@@ -183,6 +186,26 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
           </>
         ) : null}
       </ScrollView>
+
+      {abierto ? (
+        <Pressable
+          style={[estilos.accion, { backgroundColor: paleta.verdeAccion, marginBottom: 24 + margenes.bottom }]}
+          accessibilityRole="button"
+          accessibilityLabel={compromiso.direccion === 'me_deben' ? 'Registrar cobro' : 'Registrar pago'}
+          onPress={() => setModalAbono(true)}
+        >
+          <Text style={estilos.accionTexto}>
+            {compromiso.direccion === 'me_deben' ? 'Registrar cobro' : 'Registrar pago'}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      <ModalAbono
+        visible={modalAbono}
+        alCerrar={() => setModalAbono(false)}
+        compromiso={compromiso}
+        transacciones={transacciones}
+      />
     </View>
   );
 }
@@ -313,5 +336,16 @@ const estilos = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     paddingTop: 24,
+  },
+  accion: {
+    borderRadius: 14,
+    marginHorizontal: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  accionTexto: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
