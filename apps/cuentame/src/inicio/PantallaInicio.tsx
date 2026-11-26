@@ -145,6 +145,18 @@ export function PantallaInicio() {
           : total,
       0,
     );
+  // Seguro para gastar hoy (T012, #118): (ingresos del mes − gastos del
+  // mes) ÷ días restantes del mes, contando hoy. Un mes sin movimientos
+  // da $0.00 y un resultado negativo se pisa en cero: nunca se sugiere
+  // gastar dinero que no hay. El último día del mes el divisor es 1.
+  const ahora = new Date();
+  const inicioMesISO = aISO(new Date(ahora.getFullYear(), ahora.getMonth(), 1));
+  const finMesISO = aISO(new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0));
+  const delMes = transacciones.filter((t) => t.fecha >= inicioMesISO && t.fecha <= finMesISO);
+  const ingresosMes = delMes.reduce((total, t) => (t.tipo === 'ingreso' ? total + t.monto : total), 0);
+  const gastosMes = delMes.reduce((total, t) => (t.tipo === 'gasto' ? total + t.monto : total), 0);
+  const diasRestantes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate() - ahora.getDate() + 1;
+  const seguroHoy = Math.max(0, ingresosMes - gastosMes) / diasRestantes;
   // Períodos del gráfico y del Mayor gasto (T010): la semana en curso
   // (lunes a domingo, 7 barras) y el mes en curso (una barra por día). El
   // período anterior es el mismo rango corrido atrás, para el porcentaje.
@@ -271,6 +283,22 @@ export function PantallaInicio() {
           </Pressable>
         </View>
         <Text style={[estilos.balanceTexto, { color: paleta.textoSuave }]}>Balance total</Text>
+
+        {/* Seguro para gastar hoy (T012, #118): lo que cabe gastar hoy sin
+            descuadrar el mes, estilo PocketGuard. El ojito lo enmascara
+            con el mismo criterio que el saldo. */}
+        <View style={estilos.seguro}>
+          <GlifoEscudo />
+          <View style={estilos.seguroTextos}>
+            <Text style={[estilos.seguroTitulo, { color: paleta.texto }]} numberOfLines={1}>
+              Seguro para gastar hoy
+            </Text>
+            <Text style={[estilos.seguroCaption, { color: paleta.textoSuave }]}>
+              Ingresos del mes menos gastos, entre los días que faltan
+            </Text>
+          </View>
+          <Text style={[estilos.seguroMonto, { color: paleta.texto }]}>{saldoTexto(seguroHoy)}</Text>
+        </View>
 
         {/* Tarjeta Mis carteras: una fila por cartera con su icono, nombre
             y saldo. Ver todo navega a la pantalla Mis carteras de Cuenta
@@ -596,6 +624,17 @@ function GlifoCerdito() {
   );
 }
 
+// Escudo dibujado con vistas (T012, #118): mismo criterio del repo, sin
+// dependencias nuevas y nada pedido por URL.
+function GlifoEscudo() {
+  return (
+    <View style={estilos.escudo}>
+      <View style={[estilos.escudoCuerpo, { backgroundColor: paleta.verdeAccion }]} />
+      <View style={[estilos.escudoPunta, { borderTopColor: paleta.verdeAccion }]} />
+    </View>
+  );
+}
+
 // Fila de Transacciones recientes: círculo con glifo y color de la
 // categoría (mapa fijo T007), título = categoría, subtítulo = fecha de la
 // transacción y monto coloreado como MoneyLover (ingresos azul, gastos
@@ -719,6 +758,56 @@ const estilos = StyleSheet.create({
   balanceTexto: {
     fontSize: 15,
     marginTop: 2,
+  },
+  seguro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: paleta.verdeAccion,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  seguroTextos: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  seguroTitulo: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  seguroCaption: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  seguroMonto: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    marginLeft: 10,
+  },
+  escudo: {
+    width: 16,
+    alignItems: 'center',
+  },
+  escudoCuerpo: {
+    width: 16,
+    height: 12,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  escudoPunta: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
   },
   tarjeta: {
     borderRadius: 16,
