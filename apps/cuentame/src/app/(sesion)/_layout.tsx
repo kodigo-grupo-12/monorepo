@@ -12,10 +12,13 @@ import { paleta } from '../../tema/colores';
 // cubre las cuatro rutas. Sin sesión, manda de vuelta a la entrada, así
 // el carrusel y el login siguen sin navbar.
 export default function DisposicionSesion() {
-  const { cargando, activa } = useSesion();
+  const { cargando, activa, arranque } = useSesion();
   const [modalAbierto, setModalAbierto] = useState(false);
 
-  if (cargando) {
+  // La verificación del arranque (T015) también se cubre: antes el inicio
+  // se asomaba detrás de la bienvenida hasta que llegaban las escuchas
+  // (comentario del PR #148).
+  if (cargando || (activa && arranque === 'verificando')) {
     return <View style={{ flex: 1, backgroundColor: paleta.fondo }} />;
   }
 

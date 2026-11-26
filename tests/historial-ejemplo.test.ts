@@ -97,6 +97,23 @@ describe('generarHistorialEjemplo (puro)', () => {
     }
   });
 
+  it('la cartera de efectivo del ejemplo nunca queda en negativo, para muchas cuentas (hallazgo del recorrido del PR #148)', () => {
+    const enCentavos = (monto: number) => Math.round(monto * 100);
+    const uids = ['persona-ejemplo', 'otra-persona', ...Array.from({ length: 28 }, (_, i) => `cuenta-${i}`)];
+    const enRojo = uids
+      .map((uid) =>
+        historial(uid).transacciones
+          .filter((transaccion) => transaccion.cartera_id === `efectivo-${uid}`)
+          .reduce(
+            (saldo, transaccion) =>
+              saldo + (transaccion.tipo === 'ingreso' ? enCentavos(transaccion.monto) : -enCentavos(transaccion.monto)),
+            0,
+          ),
+      )
+      .filter((saldo) => saldo < 0);
+    expect(enRojo).toEqual([]);
+  });
+
   it('falla ruidoso si falta una de las categorías de producción', () => {
     const sinSalud = CATEGORIAS.filter((categoria) => categoria.nombre !== 'Salud');
     expect(() => generarHistorialEjemplo({ uid: UID, hoy: HOY, categorias: sinSalud })).toThrow(/Salud/);

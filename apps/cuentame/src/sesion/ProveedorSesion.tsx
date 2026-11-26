@@ -11,6 +11,7 @@ import type { UsuarioSesion } from './usuario';
 
 type EstadoDeSesion = {
   cargando: boolean;
+  arranque: EstadoArranque;
   activa: boolean;
   usuario: UsuarioSesion | null;
   entrar: () => Promise<void>;
@@ -121,7 +122,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
 
   return (
     <Contexto.Provider
-      value={{ cargando, activa: usuario !== null, usuario, entrar, salir }}
+      value={{ cargando, arranque, activa: usuario !== null, usuario, entrar, salir }}
     >
       {children}
       {usuario && arranque === 'elegir' ? (
