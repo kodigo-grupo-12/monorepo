@@ -71,8 +71,20 @@ La sección del libro donde se ven y se registran los ingresos y los gastos. Hoy
 _Avoid_: historial, registro, gastos
 
 **Agente**:
-La sección donde la persona conversa con los agentes de la app. Hoy muestra el placeholder.
+La sección donde la persona conversa con el Agente: un chat que responde preguntas sobre su dinero con herramientas que calculan sobre sus transacciones (ADR-0018). Hoy es la pantalla real con burbujas y preguntas de ejemplo.
 _Avoid_: chatbot, asistente virtual, IA
+
+**Herramienta**:
+Cada función pura que el Agente ejecuta en el aparato (resolverCategoria, totalPorCategoria, diaConMasGasto, gastoDelMes, resumenIngresos) y que devuelve un resultado, nunca las transacciones crudas.
+_Avoid_: function call, API, endpoint
+
+**Rango**:
+El período de fechas AAAA-MM-DD que una herramienta del Agente usa para calcular, armado por el orquestador a partir de un periodo (hoy, este_mes, mes_pasado, ultimo_mes, este_anio, todo) o de fechas concretas.
+_Avoid_: window, query, fecha rango
+
+**Cobertura**:
+Lo que cada resultado del Agente dice sobre su alcance: cuántas transacciones consideró, cuándo empieza el historial, cuántas van sin categoría y si el rango arranca antes de la primera transacción.
+_Avoid_: stats, metadata
 
 **Cuenta**:
 La pantalla de la persona que usa la app: su perfil, sus ajustes y el cierre de sesión.

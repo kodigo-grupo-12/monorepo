@@ -1,0 +1,11 @@
+# El Agente usa Gemini por Firebase AI Logic con herramientas en el aparato
+
+Decisión aceptada el 2026-11-26 (spec #107, T011). El chat del Agente corre con la Gemini Developer API a través del SDK de Firebase AI Logic (`firebase/ai`, que ya trae `firebase@13.4.0`, sin dependencias nuevas) contra el backend `GoogleAIBackend`, en la capa gratis del plan Spark (cuota vigente hasta el 2027-01-21). El nombre del modelo vive solo en `apps/cuentame/src/agente/config.ts` (`MODELO_AGENTE = 'gemini-3.5-flash-lite'`); una búsqueda de `gemini-` en `src` debe mostrar únicamente ese archivo.
+
+Se consideró RubyLLM y se descartó (decisión de Roberto del 2026-11-26): añadiría una capa de Ruby sobre un proyecto JavaScript y apartaría el código de lo que ya hay. El modo automático de herramientas del SDK tampoco se usa: el orquestador hace su propio bucle con tope de 4 rondas para poder ejecutar las herramientas en el aparato, validar los argumentos y responder con un mensaje concreto si el modelo insiste en pedir herramientas.
+
+App Check queda fuera solo del MVP: en `kodigo-grupo12` nunca se inició, no hay apps registradas ni exigencia para AI Logic, así que no hay nada que desactivar en la consola. Sin App Check, la llamada funciona con el cliente web de la demo; cuando entre App Check, el Agente debe inicializarlo junto con el resto de la app.
+
+La implementación web usa `getAI(firebase, { backend: new GoogleAIBackend() })` y `getGenerativeModel`, manda la conversación completa en cada `generateContent` y traduce los function calls del SDK a la interfaz de modelo del orquestador. En nativo (`modeloFirebaseAI.native.ts`) el Agente no corre: AI Logic en Android pide App Check con Play Integrity y la salida del MVP es solo web. Al modelo nunca llegan notas, imágenes ni la lista de transacciones: solo la conversación y los resultados de las herramientas, que calculan en el aparato con funciones puras (#113).
+
+Consecuencias: la prueba de humo del paso 0 se corrió con el script exacto de #113 sin App Check y respondió `OK: Listo` el 2026-11-26; si la API no se activa o App Check se vuelve exigente, el spec manda parar y avisar antes de activar App Check, cambiar de proveedor o meter llaves. La cuota gratis vence el 2027-01-21: pasado esa fecha la demo puede dejar de responder con el mensaje de cuota ya traducido en `errores.ts`.
