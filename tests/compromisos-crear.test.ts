@@ -10,6 +10,7 @@ import { doc, getDoc, getDocs } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  armarBatchBorrado,
   armarBatchCompromiso,
   consultaCompromisosPorDuenio,
   consultaTransaccionesPorDuenio,
@@ -172,5 +173,59 @@ describe('armarBatchCompromiso', () => {
     // El compromiso lleva uid ajeno y la transacción lleva compromiso_id con
     // rol 'origen': ambas escrituras chocan con las reglas del dueño.
     await expect(batch.commit()).rejects.toThrow();
+  });
+});
+
+describe('armarBatchBorrado', () => {
+  it("con 'todo' deja cero documentos del compromiso y de sus transacciones", async () => {
+    const db = dbDe();
+    const { batch, id } = armarBatchCompromiso(
+      db,
+      { direccion: 'me_deben', naturaleza: 'dinero', contraparte: 'Juan', monto: 50, fecha: '2026-11-26' },
+      UID_A,
+      { cartera_id: 'efectivo' },
+    );
+    await batch.commit();
+
+    const amarradas = await getDocs(consultaTransaccionesPorDuenio(db, UID_A));
+    const idsAmarradas = amarradas.docs.map((d) => d.id);
+    expect(idsAmarradas.length).toBeGreaterThan(0);
+    const { batches } = armarBatchBorrado(db, id, idsAmarradas, 'todo');
+    for (const b of batches) {
+      await b.commit();
+    }
+
+    const compromisos = await getDocs(consultaCompromisosPorDuenio(db, UID_A));
+    expect(compromisos.size).toBe(0);
+    const transacciones = await getDocs(consultaTransaccionesPorDuenio(db, UID_A));
+    expect(transacciones.size).toBe(0);
+  });
+
+  it("con 'soltar' las transacciones quedan sin compromiso_id, rol ni neutral", async () => {
+    const db = dbDe();
+    const { batch, id } = armarBatchCompromiso(
+      db,
+      { direccion: 'me_deben', naturaleza: 'dinero', contraparte: 'Juan', monto: 50, fecha: '2026-11-26' },
+      UID_A,
+      { cartera_id: 'efectivo' },
+    );
+    await batch.commit();
+
+    const amarradas = await getDocs(consultaTransaccionesPorDuenio(db, UID_A));
+    const idsAmarradas = amarradas.docs.map((d) => d.id);
+    const { batches } = armarBatchBorrado(db, id, idsAmarradas, 'soltar');
+    for (const b of batches) {
+      await b.commit();
+    }
+
+    const compromisos = await getDocs(consultaCompromisosPorDuenio(db, UID_A));
+    expect(compromisos.size).toBe(0);
+    const transacciones = await getDocs(consultaTransaccionesPorDuenio(db, UID_A));
+    expect(transacciones.size).toBe(1);
+    const t = transacciones.docs[0].data();
+    expect(t).not.toHaveProperty('compromiso_id');
+    expect(t).not.toHaveProperty('rol');
+    expect(t).not.toHaveProperty('neutral');
+    expect(t).toMatchObject({ tipo: 'gasto', monto: 50, cartera_id: 'efectivo' });
   });
 });

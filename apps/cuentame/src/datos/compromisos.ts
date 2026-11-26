@@ -1,11 +1,12 @@
 // Tipos y escrituras del compromiso de «Deudas y préstamos» (spec #130).
 // Nada de lo que es suma se guarda: lo abonado, lo pendiente y el estado se
 // calculan en compromisos/calculos.ts (ADR-0019).
-import { collection } from 'firebase/firestore';
+import { collection, deleteField, doc, updateDoc } from 'firebase/firestore';
 
 import { armarBatchCompromiso, COLECCION_COMPROMISOS, type DatosNuevoCompromiso } from './consultas';
 import { datosDeAbono, type DatosAbono } from '../compromisos/calculos';
-import { crearTransaccion } from './transacciones';
+import { armarBatchBorrado } from './consultas';
+import { crearTransaccion, type Transaccion } from './transacciones';
 import { db } from './firebase';
 import { uidDeSesion } from '../sesion/auth';
 
@@ -26,6 +27,53 @@ export async function crearCompromiso(
 // amarrada al compromiso con los datos calculados en compromisos/calculos.
 export async function registrarAbono(compromiso: Compromiso, abono: DatosAbono): Promise<string> {
   return crearTransaccion(datosDeAbono(compromiso, abono));
+}
+
+// Corrige lo que la persona puede cambiar (#135): contraparte, teléfono,
+// monto, vencimiento y nota. Lo indefinido se borra con deleteField, igual
+// que actualizarTransaccion. Nunca toca uid, direccion, naturaleza, plan ni
+// cierre.
+export async function actualizarCompromiso(
+  id: string,
+  cambios: Pick<Compromiso, 'contraparte' | 'telefono' | 'monto' | 'vence' | 'nota'>,
+): Promise<void> {
+  const documento: Record<string, unknown> = {};
+  for (const campo of ['contraparte', 'telefono', 'monto', 'vence', 'nota'] as const) {
+    const valor = cambios[campo];
+    if (valor === undefined) {
+      documento[campo] = deleteField();
+    } else {
+      documento[campo] = valor;
+    }
+  }
+  await updateDoc(doc(db, COLECCION_COMPROMISOS, id), documento);
+}
+
+// Cierra sin inventar un cobro: perdonado o cancelado (#135).
+export async function cerrarCompromiso(id: string, cierre: Cierre): Promise<void> {
+  await updateDoc(doc(db, COLECCION_COMPROMISOS, id), { cierre });
+}
+
+// Reabre un compromiso perdonado o cancelado (#135).
+export async function reabrirCompromiso(id: string): Promise<void> {
+  await updateDoc(doc(db, COLECCION_COMPROMISOS, id), { cierre: deleteField() });
+}
+
+// Borra el compromiso y decide qué pasa con sus transacciones amarradas
+// (#135): con 'todo' se borran, con 'soltar' quedan sueltas contando como
+// gasto o ingreso normal.
+export async function borrarCompromiso(
+  compromiso: Compromiso,
+  transaccionesAmarradas: Transaccion[],
+  modo: 'todo' | 'soltar',
+): Promise<void> {
+  const ids = transaccionesAmarradas
+    .filter((t) => t.compromiso_id === compromiso.id && t.id)
+    .map((t) => t.id as string);
+  const { batches } = armarBatchBorrado(db, compromiso.id as string, ids, modo);
+  for (const batch of batches) {
+    await batch.commit();
+  }
 }
 
 export type Direccion = 'me_deben' | 'debo';

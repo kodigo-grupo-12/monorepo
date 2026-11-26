@@ -8,8 +8,10 @@ import {
   notaDeAbono,
   notaDeOrigen,
   ordenarParaLista,
+  amarradasA,
   datosDeAbono,
   validarAbono,
+  validarNuevoMonto,
   estaAbierto,
   estadoDe,
   pendienteDe,
@@ -212,5 +214,24 @@ describe('validarAbono', () => {
     expect(validarAbono(30.01, 30)).toBe('excede');
     expect(validarAbono(30, 30)).toBe('ok');
     expect(validarAbono(0, 30)).toBe('cero');
+  });
+});
+
+describe('amarradasA', () => {
+  it('trae el origen y los abonos de ese compromiso y nada más', () => {
+    const otro = transaccion({ id: 't2' });
+    const origen = transaccion({ id: 't3', compromiso_id: 'c1', rol: 'origen' });
+    const abono1 = transaccion({ id: 't4', compromiso_id: 'c1', rol: 'abono' });
+    const abono2 = transaccion({ id: 't5', compromiso_id: 'c1', rol: 'abono' });
+    const amarradas = amarradasA('c1', [otro, origen, abono1, abono2]);
+    expect(amarradas.map((t) => t.id)).toEqual(['t3', 't4', 't5']);
+  });
+});
+
+describe('validarNuevoMonto', () => {
+  it('rechaza un monto menor que lo abonado, en centavos', () => {
+    expect(validarNuevoMonto(19.99, 20)).toBe('menor_que_abonado');
+    expect(validarNuevoMonto(20, 20)).toBe('ok');
+    expect(validarNuevoMonto(20.01, 20)).toBe('ok');
   });
 });

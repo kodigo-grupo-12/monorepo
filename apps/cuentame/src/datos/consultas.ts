@@ -2,6 +2,7 @@ import type { Compromiso } from './compromisos';
 import { notaDeOrigen } from '../compromisos/calculos';
 import {
   collection,
+  deleteField,
   doc,
   orderBy,
   query,
@@ -154,6 +155,46 @@ export function armarBatchCompromiso(
     );
   }
   return { batch, id: referencia.id };
+}
+
+// Borra un compromiso y decide qué pasa con sus transacciones amarradas
+// (#135): con 'todo' se borran, con 'soltar' pierden el amarre (compromiso_id,
+// rol y neutral con deleteField) y quedan como gasto o ingreso normales. Con
+// más de 450 escrituras se parte en varios batches.
+const TOPE_BORRADO = 450;
+
+export function armarBatchBorrado(
+  db: Firestore,
+  compromisoId: string,
+  amarradasIds: string[],
+  modo: 'todo' | 'soltar',
+): { batches: WriteBatch[] } {
+  const batches: WriteBatch[] = [];
+  let batch = writeBatch(db);
+  batch.delete(doc(db, COLECCION_COMPROMISOS, compromisoId));
+  let escrituras = 1;
+  for (const idAmarrada of amarradasIds) {
+    if (escrituras >= TOPE_BORRADO) {
+      batches.push(batch);
+      batch = writeBatch(db);
+      escrituras = 0;
+    }
+    const referencia = doc(db, COLECCION_TRANSACCIONES, idAmarrada);
+    if (modo === 'todo') {
+      batch.delete(referencia);
+    } else {
+      batch.update(referencia, {
+        compromiso_id: deleteField(),
+        rol: deleteField(),
+        neutral: deleteField(),
+      });
+    }
+    escrituras += 1;
+  }
+  if (escrituras > 0) {
+    batches.push(batch);
+  }
+  return { batches };
 }
 
 // Sin orderBy a propósito: el orden se hace en el aparato y así no hace

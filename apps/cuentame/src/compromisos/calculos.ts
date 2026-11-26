@@ -159,6 +159,16 @@ export function validarAbono(monto: number, pendiente: number): 'ok' | 'cero' | 
   return 'ok';
 }
 
+// Todas las transacciones amarradas a un compromiso: el origen y sus abonos.
+export function amarradasA(compromisoId: string, transacciones: Transaccion[]): Transaccion[] {
+  return transacciones.filter((t) => t.compromiso_id === compromisoId);
+}
+
+// El monto corregido no puede quedar por debajo de lo ya abonado.
+export function validarNuevoMonto(monto: number, abonado: number): 'ok' | 'menor_que_abonado' {
+  return Math.round(monto * 100) < Math.round(abonado * 100) ? 'menor_que_abonado' : 'ok';
+}
+
 export function resumenCompromisos(
   compromisos: Compromiso[],
   transacciones: Transaccion[],

@@ -11,6 +11,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  deleteField,
   getDoc,
   getDocs,
   query,
@@ -490,6 +491,10 @@ describe('reglas de compromisos', () => {
     await assertSucceeds(setDoc(doc(db, 'compromisos', 'c-u'), compromisoDe(UID_A)));
     await assertFails(updateDoc(doc(db, 'compromisos', 'c-u'), { cierre: 'pagado' }));
     await assertSucceeds(updateDoc(doc(db, 'compromisos', 'c-u'), { cierre: 'perdonado' }));
+    // Reabrir (#135): el cierre sale del documento con deleteField.
+    await assertSucceeds(
+      updateDoc(doc(db, 'compromisos', 'c-u'), { cierre: deleteField() }),
+    );
   });
 
   it('los campos de amarre de transacciones pasan o no según las reglas', async () => {
