@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   avisoAlBorrar,
+  proximosVencimientos,
+  sumarDias,
   abonadoDe,
   abonosDe,
   diasDeAtraso,
@@ -17,6 +19,7 @@ import {
   estadoDe,
   pendienteDe,
   resumenCompromisos,
+  montoBaseDe,
 } from '../../apps/cuentame/src/compromisos/calculos';
 import type { Compromiso } from '../../apps/cuentame/src/datos/compromisos';
 import type { Transaccion } from '../../apps/cuentame/src/datos/transacciones';
@@ -38,6 +41,13 @@ function compromiso(extra: Partial<Compromiso> = {}): Compromiso {
 function transaccion(extra: Partial<Transaccion> = {}): Transaccion {
   return { id: 't1', tipo: 'gasto', monto: 10, fecha: '2026-11-20', ...extra };
 }
+
+describe('montoBaseDe', () => {
+  it('la compra usa su precio de contado y el dinero su monto', () => {
+    expect(montoBaseDe(compromiso({ naturaleza: 'compra', precio_contado: 100, monto: undefined }))).toBe(100);
+    expect(montoBaseDe(compromiso())).toBe(50);
+  });
+});
 
 describe('esMovimientoReal', () => {
   it('un movimiento neutral no es real y el resto sí', () => {
@@ -95,6 +105,16 @@ describe('pendienteDe y estadoDe', () => {
     expect(estadoDe(compromiso(), transacciones, HOY)).toBe('activo');
   });
 
+  // Hallazgo del run del 2026-11-26 (#137): una compra no tiene monto, solo
+  // precio_contado; el cálculo con monto directo daba NaN y el NaN filtraba
+  // la compra de los vencimientos y envenenaba el resumen.
+  it('una compra sin monto usa precio_contado y no da NaN', () => {
+    const compra = compromiso({ naturaleza: 'compra', precio_contado: 100, monto: undefined });
+    expect(pendienteDe(compra, [])).toBe(100);
+    expect(estadoDe(compra, [], HOY)).toBe('activo');
+    expect(estadoDe({ ...compra, vence: '2026-11-20' }, [], HOY)).toBe('vencido');
+  });
+
   it('con vence pasado y pendiente el estado es vencido y los días de atraso cuadran', () => {
     const c = compromiso({ vence: '2026-11-20' });
     expect(estadoDe(c, [], HOY)).toBe('vencido');
@@ -138,6 +158,13 @@ describe('resumenCompromisos', () => {
     expect(resumen.meDeben).toBeCloseTo(40, 2);
     expect(resumen.debo).toBeCloseTo(30, 2);
     expect(resumen.vencidos).toBe(1);
+  });
+
+  it('la compra cuenta por precio_contado y el resumen no da NaN', () => {
+    const ana = compromiso({ id: 'ana', naturaleza: 'compra', precio_contado: 100, monto: undefined });
+    const resumen = resumenCompromisos([ana], [], HOY);
+    expect(resumen.meDeben).toBeCloseTo(100, 2);
+    expect(resumen.debo).toBe(0);
   });
 });
 
@@ -262,5 +289,61 @@ describe('avisoAlBorrar', () => {
   it('una transacción suelta no lleva aviso', () => {
     expect(avisoAlBorrar(transaccion(), [compromiso()])).toBeUndefined();
     expect(avisoAlBorrar(transaccion({ compromiso_id: 'otro', rol: 'origen' }), [compromiso()])).toBeUndefined();
+  });
+});
+
+describe('sumarDias', () => {
+  it('cruza mes y año, y respeta los bisiestos', () => {
+    expect(sumarDias('2026-12-28', 7)).toBe('2027-01-04');
+    expect(sumarDias('2028-02-27', 2)).toBe('2028-02-29');
+    expect(sumarDias('2026-11-26', 0)).toBe('2026-11-26');
+  });
+});
+
+describe('proximosVencimientos', () => {
+  function vencimiento(extra: Partial<Compromiso> = {}): Compromiso {
+    return compromiso({ vence: '2026-12-19', ...extra });
+  }
+
+  it('atrasados, de hoy y de la semana, en ese orden y por fecha', () => {
+    const atrasado = vencimiento({ id: 'c1', contraparte: 'Juan', vence: '2026-12-15' });
+    const deHoy = vencimiento({ id: 'c2', contraparte: 'Ana', vence: '2026-12-19' });
+    const proximo = vencimiento({ id: 'c3', contraparte: 'Beto', vence: '2026-12-26' });
+    const lista = proximosVencimientos([proximo, deHoy, atrasado], [], '2026-12-19');
+    expect(lista.map((v) => v.compromiso.id)).toEqual(['c1', 'c2', 'c3']);
+    expect(lista.map((v) => v.situacion)).toEqual(['atrasado', 'hoy', 'proximo']);
+    expect(lista[0].diasAtraso).toBe(4);
+    expect(lista[0].pendiente).toBe(50);
+  });
+
+  it('fuera de la ventana, lo cerrado y lo sin fecha no entran', () => {
+    const lejos = vencimiento({ id: 'c1', vence: '2026-12-27' });
+    const cerrado = vencimiento({ id: 'c2', vence: '2026-12-18', cierre: 'perdonado' });
+    const pagado = vencimiento({ id: 'c3', vence: '2026-12-18' });
+    const pagadas = [transaccion({ id: 'b1', compromiso_id: 'c3', rol: 'abono', tipo: 'ingreso', monto: 50 })];
+    const sinFecha = vencimiento({ id: 'c4', vence: undefined });
+    const lista = proximosVencimientos([lejos, cerrado, pagado, sinFecha], pagadas, '2026-12-19');
+    expect(lista).toEqual([]);
+  });
+
+  it('una compra que vence hoy entra con su pendiente de precio_contado', () => {
+    const ana = vencimiento({
+      id: 'ana',
+      contraparte: 'Ana',
+      naturaleza: 'compra',
+      precio_contado: 100,
+      monto: undefined,
+      vence: '2026-12-19',
+    });
+    const lista = proximosVencimientos([ana], [], '2026-12-19');
+    expect(lista).toHaveLength(1);
+    expect(lista[0].situacion).toBe('hoy');
+    expect(lista[0].pendiente).toBe(100);
+  });
+
+  it('respeta la ventana pedida', () => {
+    const enDoceDias = vencimiento({ id: 'c1', vence: '2026-12-31' });
+    expect(proximosVencimientos([enDoceDias], [], '2026-12-19', 12)).toHaveLength(1);
+    expect(proximosVencimientos([enDoceDias], [], '2026-12-19')).toHaveLength(0);
   });
 });

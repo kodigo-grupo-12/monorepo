@@ -31,8 +31,10 @@ import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 import { ContadorAnimado } from '../animaciones/ContadorAnimado';
 import { Esqueleto } from '../animaciones/Esqueleto';
 import { useAjustes } from '../ajustes/ProveedorAjustes';
-import { avisoAlBorrar, esMovimientoReal } from '../compromisos/calculos';
+import { avisoAlBorrar, esMovimientoReal, proximosVencimientos } from '../compromisos/calculos';
+import { TarjetaVencimientos } from '../compromisos/TarjetaVencimientos';
 import { useCompromisos } from '../datos/useCompromisos';
+import { useSesion } from '../sesion/ProveedorSesion';
 
 type Periodo = 'semana' | 'mes';
 
@@ -41,13 +43,29 @@ const DURACION_MS = 180;
 const VISIBLE_MS = 2000;
 const controladorNativo = Platform.OS !== 'web';
 
+// La marca de que ya salió el aviso diario de vencimientos (#137) vive en
+// memoria del módulo, no en Firestore ni AsyncStorage: al recargar la app
+// puede volver a salir.
+let ultimoAviso: { uid: string; hoy: string } | undefined;
+
+// Solo la primera llamada del día con el mismo uid devuelve true.
+function avisarUnaVezPorDia(uid: string, hoy: string): boolean {
+  if (ultimoAviso && ultimoAviso.uid === uid && ultimoAviso.hoy === hoy) {
+    return false;
+  }
+  ultimoAviso = { uid, hoy };
+  return true;
+}
+
 export function PantallaInicio() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
   const { transacciones, cargando, error } = useTransacciones();
   const { categorias } = useCategorias();
   const { carteras } = useCarteras();
-  const { compromisos } = useCompromisos();
+  const { compromisos, cargando: cargandoCompromisos } = useCompromisos();
+  const { usuario } = useSesion();
+  const uid = usuario?.uid;
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   // El ojito (T010): alterna montos ↔ ***** en todo el Inicio por
@@ -132,6 +150,30 @@ export function PantallaInicio() {
       window.removeEventListener('popstate', quedarse);
     };
   }, [enrutador]);
+
+  // Aviso diario de vencimientos (#137): una vez por día y por uid, con el
+  // tipo y la acción del issue. El canal de la T013 ya respeta el ajuste de
+  // avisos in-app de Configuraciones.
+  useEffect(() => {
+    if (cargando || cargandoCompromisos || !uid) {
+      return;
+    }
+    const hoy = hoyISO();
+    const apurados = proximosVencimientos(compromisos, transacciones, hoy).filter(
+      (vencimiento) => vencimiento.situacion === 'atrasado' || vencimiento.situacion === 'hoy',
+    );
+    if (apurados.length === 0 || !avisarUnaVezPorDia(uid, hoy)) {
+      return;
+    }
+    mostrarAviso({
+      mensaje:
+        apurados.length === 1
+          ? 'Tenés 1 deuda o préstamo que vence hoy o está atrasado'
+          : `Tenés ${apurados.length} deudas o préstamos que vencen hoy o están atrasados`,
+      tipo: apurados.some((vencimiento) => vencimiento.situacion === 'atrasado') ? 'error' : 'exito',
+      accion: { etiqueta: 'Ver', alTocar: () => enrutador.push('/deudas') },
+    });
+  }, [compromisos, transacciones, cargando, cargandoCompromisos, uid, enrutador]);
 
   // ADR-0011: el saldo nunca vive en el documento, se agrega en vivo desde
   // el snapshot. Balance total = todas las transacciones; cada cartera, las
@@ -369,6 +411,8 @@ export function PantallaInicio() {
             </View>
           ))}
         </View>
+
+        <TarjetaVencimientos compromisos={compromisos} transacciones={transacciones} />
 
         {/* Reportar este mes: el enlace lanza el toast global; no hay
             pantalla de informes en esta pasada. */}

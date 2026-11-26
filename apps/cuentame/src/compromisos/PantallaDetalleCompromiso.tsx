@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,9 +10,10 @@ import { useTransacciones } from '../datos/useTransacciones';
 import { cerrarCompromiso, reabrirCompromiso, borrarCompromiso } from '../datos/compromisos';
 import { mostrarAviso } from '../avisos/avisos';
 import { deISO, hoyISO } from '../transacciones/fechas';
+import { enlaceWhatsApp, mensajeRecordatorio } from './recordatorio';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { paleta } from '../tema/colores';
-import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe } from './calculos';
+import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe, montoBaseDe } from './calculos';
 import { ModalAbono } from './ModalAbono';
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -98,6 +99,9 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
   const abonos = abonosDe(compromiso.id ?? '', transacciones).slice().reverse();
   const vencido = estado === 'vencido';
   const abierto = estado === 'activo' || estado === 'vencido';
+  // El botón «Recordarle» (#137) solo tiene sentido cuando a mí me deben
+  // y el compromiso sigue abierto: con «debo» no se muestra.
+  const recuerda = abierto && compromiso.direccion === 'me_deben';
   const amarradas = amarradasA(compromiso.id ?? '', transacciones);
   // Alias estrechado: las funciones asíncronas no heredan el estrechamiento.
   const compromisoActual = compromiso;
@@ -216,7 +220,7 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
         <View style={estilos.montos}>
           <View style={estilos.montoCaja}>
             <Text style={[estilos.montoEtiqueta, { color: paleta.textoSuave }]}>Monto</Text>
-            <Text style={[estilos.montoValor, { color: paleta.texto }]}>$ {compromiso.monto.toFixed(2)}</Text>
+            <Text style={[estilos.montoValor, { color: paleta.texto }]}>$ {montoBaseDe(compromiso).toFixed(2)}</Text>
           </View>
           <View style={estilos.montoCaja}>
             <Text style={[estilos.montoEtiqueta, { color: paleta.textoSuave }]}>Abonado</Text>
@@ -277,7 +281,7 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
 
       {abierto ? (
         <Pressable
-          style={[estilos.accion, { backgroundColor: paleta.verdeAccion, marginBottom: 24 + margenes.bottom }]}
+          style={[estilos.accion, { backgroundColor: paleta.verdeAccion, marginBottom: recuerda ? 10 : 24 + margenes.bottom }]}
           accessibilityRole="button"
           accessibilityLabel={compromiso.direccion === 'me_deben' ? 'Registrar cobro' : 'Registrar pago'}
           onPress={() => setModalAbono(true)}
@@ -285,6 +289,21 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
           <Text style={estilos.accionTexto}>
             {compromiso.direccion === 'me_deben' ? 'Registrar cobro' : 'Registrar pago'}
           </Text>
+        </Pressable>
+      ) : null}
+
+      {recuerda ? (
+        <Pressable
+          style={[estilos.accion, { backgroundColor: paleta.dialogoBoton, marginBottom: 24 + margenes.bottom }]}
+          accessibilityRole="button"
+          accessibilityLabel="Recordarle por WhatsApp"
+          onPress={() => {
+            void Linking.openURL(
+              enlaceWhatsApp(compromiso.telefono, mensajeRecordatorio(compromiso, pendiente, hoy)),
+            );
+          }}
+        >
+          <Text style={[estilos.accionTexto, { color: paleta.texto }]}>Recordarle</Text>
         </Pressable>
       ) : null}
 

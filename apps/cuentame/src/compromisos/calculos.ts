@@ -43,9 +43,16 @@ export function abonadoDe(compromisoId: string, transacciones: Transaccion[]): n
   return abonadoEnCentavos(compromisoId, transacciones) / 100;
 }
 
+// El monto que representa el compromiso: para la compra es su precio de
+// contado (#137); para el dinero, su monto.
+export function montoBaseDe(compromiso: Compromiso): number {
+  return compromiso.naturaleza === 'compra' ? compromiso.precio_contado ?? 0 : compromiso.monto ?? 0;
+}
+
 export function pendienteDe(compromiso: Compromiso, transacciones: Transaccion[]): number {
   const abonado = abonadoEnCentavos(compromiso.id ?? '', transacciones);
-  return Math.max(0, enCentavos(compromiso.monto) - abonado) / 100;
+  const base = enCentavos(montoBaseDe(compromiso));
+  return Math.max(0, base - abonado) / 100;
 }
 
 export function estadoDe(
@@ -64,6 +71,55 @@ export function estadoDe(
     return 'vencido';
   }
   return 'activo';
+}
+
+// Días sumados por partes, sin librerías: cruza meses y años y respeta
+// los bisiestos (2028-02-27 + 2 da 2028-02-29).
+export function sumarDias(iso: string, n: number): string {
+  const [anio, mes, dia] = iso.split('-').map(Number);
+  const fecha = new Date(anio, mes - 1, dia + n);
+  const mesTexto = `${fecha.getMonth() + 1}`.padStart(2, '0');
+  const diaTexto = `${fecha.getDate()}`.padStart(2, '0');
+  return `${fecha.getFullYear()}-${mesTexto}-${diaTexto}`;
+}
+
+export interface Vencimiento {
+  compromiso: Compromiso;
+  fecha: string;
+  pendiente: number;
+  situacion: 'atrasado' | 'hoy' | 'proximo';
+  diasAtraso: number;
+}
+
+// Lo que vence hoy o en los próximos dias días (#137), atrasados primero por
+// fecha. Solo abiertos con vence dentro de la ventana. La fase 2 (#138) le
+// agrega las cuotas.
+export function proximosVencimientos(
+  compromisos: Compromiso[],
+  transacciones: Transaccion[],
+  hoy: string,
+  dias = 7,
+): Vencimiento[] {
+  const limite = sumarDias(hoy, dias);
+  return compromisos
+    .filter(
+      (c) =>
+        c.vence !== undefined &&
+        c.vence <= limite &&
+        estaAbierto(estadoDe(c, transacciones, hoy)) &&
+        pendienteDe(c, transacciones) > 0,
+    )
+    .map((c) => {
+      const atraso = diasDeAtraso(c.vence!, hoy);
+      return {
+        compromiso: c,
+        fecha: c.vence!,
+        pendiente: pendienteDe(c, transacciones),
+        situacion: atraso > 0 ? 'atrasado' : c.vence === hoy ? 'hoy' : 'proximo',
+        diasAtraso: atraso,
+      } as Vencimiento;
+    })
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
 }
 
 // Días enteros entre dos fechas AAAA-MM-DD, 0 si hoy no es mayor que desde.
