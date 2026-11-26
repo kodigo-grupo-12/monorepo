@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Vibration,
   Text,
   View,
 } from 'react-native';
@@ -87,6 +88,7 @@ export function PantallaInicio() {
     if (!pendiente?.id || eliminando) {
       return;
     }
+    Vibration.vibrate(10);
     setEliminando(true);
     try {
       await eliminarTransaccion(pendiente.id);

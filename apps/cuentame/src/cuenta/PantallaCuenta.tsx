@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from 'react-native';
 import { Presionable } from '../animaciones/Presionable';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -195,7 +195,10 @@ export function PantallaCuenta() {
                 style={[estilos.botonDialogo, { backgroundColor: paleta.rojo }]}
                 accessibilityRole="button"
                 accessibilityLabel="Salir"
-                onPress={() => void cerrarSesion()}
+                onPress={() => {
+                  Vibration.vibrate(10);
+                  void cerrarSesion();
+                }}
               >
                 <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Salir</Text>
               </Pressable>
