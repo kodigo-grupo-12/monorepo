@@ -12,6 +12,7 @@ import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { aspectoDe } from '../categorias/mapaCategorias';
 import { DIAS_ABREV, DIAS_SEMANA, MESES, aISO, deISO, hoyISO } from './fechas';
+import { CalendarioTransacciones } from './CalendarioTransacciones';
 
 // Ancho fijo de cada día de la tira, para poder alinear el día activo.
 const ANCHO_DIA = 62;
@@ -33,6 +34,7 @@ export function PantallaTransacciones() {
   // mueven. Sin cartera elegida se ve el Total.
   const [diaISO, setDiaISO] = useState<string>(hoyISO());
   const [carteraId, setCarteraId] = useState<string>();
+  const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   // Saldo real calculado (regla de la T007): nunca se guarda, se agrega en
@@ -190,6 +192,16 @@ export function PantallaTransacciones() {
         </Text>
       </View>
 
+      <Pressable
+        style={estilos.calendario}
+        accessibilityRole="button"
+        accessibilityLabel="Mostrar calendario"
+        onPress={() => setCalendarioAbierto(true)}
+      >
+        <GlifoCalendario />
+        <Text style={[estilos.calendarioTexto, { color: paleta.verdeAccion }]}>Mostrar calendario</Text>
+      </Pressable>
+
       <View style={estilos.bloqueDia}>
         <View style={estilos.linea} />
         <View style={estilos.encabezadoDia}>
@@ -220,6 +232,17 @@ export function PantallaTransacciones() {
           ))}
         </ScrollView>
       </View>
+
+      <CalendarioTransacciones
+        visible={calendarioAbierto}
+        diaISO={diaISO}
+        transacciones={delFiltro}
+        alCerrar={() => setCalendarioAbierto(false)}
+        alSeleccionar={(iso) => {
+          setDiaISO(iso);
+          setCalendarioAbierto(false);
+        }}
+      />
     </View>
   );
 }
@@ -262,6 +285,24 @@ function FilaTransaccion({
       >
         ${transaccion.monto.toFixed(2)}
       </Text>
+    </View>
+  );
+}
+
+// Calendario mini para la acción verde, dibujado con vistas como el resto
+// de los glifos (T004): Expo SDK 58 ya no trae un set de iconos.
+function GlifoCalendario() {
+  const verde = paleta.verdeAccion;
+
+  return (
+    <View style={estilos.calendarioGlifo}>
+      <View style={[estilos.calendarioPata, { backgroundColor: verde, left: 4 }]} />
+      <View style={[estilos.calendarioPata, { backgroundColor: verde, left: 11 }]} />
+      <View style={[estilos.calendarioMarco, { borderColor: verde }]} />
+      <View style={[estilos.calendarioLinea, { backgroundColor: verde }]} />
+      <View style={[estilos.calendarioPunto, { backgroundColor: verde, left: 3.5 }]} />
+      <View style={[estilos.calendarioPunto, { backgroundColor: verde, left: 7.5 }]} />
+      <View style={[estilos.calendarioPunto, { backgroundColor: verde, left: 11.5 }]} />
     </View>
   );
 }
@@ -413,6 +454,50 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'right',
     fontVariant: ['tabular-nums'],
+  },
+  calendario: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 22,
+  },
+  calendarioTexto: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  calendarioGlifo: {
+    width: 17,
+    height: 15,
+  },
+  calendarioPata: {
+    position: 'absolute',
+    top: 0,
+    width: 2,
+    height: 3,
+    borderRadius: 1,
+  },
+  calendarioMarco: {
+    position: 'absolute',
+    top: 2,
+    width: 17,
+    height: 13,
+    borderRadius: 3,
+    borderWidth: 2,
+  },
+  calendarioLinea: {
+    position: 'absolute',
+    top: 6,
+    left: 2.5,
+    width: 12,
+    height: 1.5,
+  },
+  calendarioPunto: {
+    position: 'absolute',
+    top: 9,
+    width: 2,
+    height: 2,
+    borderRadius: 1,
   },
   bloqueDia: {
     flex: 1,
