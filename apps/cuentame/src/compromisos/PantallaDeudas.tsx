@@ -155,7 +155,7 @@ export function PantallaDeudas() {
                   compromiso={compromiso}
                   transacciones={transacciones}
                   hoy={hoy}
-                  alTocar={() => enrutador.push({ pathname: '/deudas/[id]', params: { id: compromiso.id ?? '' } })}
+                  alTocar={() => enrutador.push({ pathname: '/(sesion)/deudas/[id]', params: { id: compromiso.id ?? '' } })}
                 />
               ))}
             </>
@@ -170,7 +170,7 @@ export function PantallaDeudas() {
                   compromiso={compromiso}
                   transacciones={transacciones}
                   hoy={hoy}
-                  alTocar={() => enrutador.push({ pathname: '/deudas/[id]', params: { id: compromiso.id ?? '' } })}
+                  alTocar={() => enrutador.push({ pathname: '/(sesion)/deudas/[id]', params: { id: compromiso.id ?? '' } })}
                 />
               ))}
             </>
@@ -198,7 +198,7 @@ export function PantallaDeudas() {
                       transacciones={transacciones}
                       hoy={hoy}
                       alTocar={() =>
-                        enrutador.push({ pathname: '/deudas/[id]', params: { id: compromiso.id ?? '' } })
+                        enrutador.push({ pathname: '/(sesion)/deudas/[id]', params: { id: compromiso.id ?? '' } })
                       }
                     />
                   ))
