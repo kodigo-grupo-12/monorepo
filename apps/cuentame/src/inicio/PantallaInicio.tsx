@@ -191,8 +191,9 @@ export function PantallaInicio() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([clave, monto]) => ({
-      nombre:
-        (clave.includes('-') ? nombresDeCategoria.get(clave) : undefined) ?? clave,
+      // El lookup va primero sin importar la forma de la clave: los ids de
+      // Firestore no llevan guiones y resuelven igual en el mapa.
+      nombre: nombresDeCategoria.get(clave) ?? clave,
       porcentaje: gastoTotalGasto > 0 ? Math.round((monto / gastoTotalGasto) * 100) : 0,
     }));
 
@@ -334,6 +335,34 @@ export function PantallaInicio() {
             </View>
           ))}
         </View>
+        {/* Transacciones recientes: las últimas 5 con FilaReciente; el
+            nombre resuelve con el mismo mapa de categorías y con el ojito
+            oculto el monto pasa a ***** conservando su color. */}
+        {recientes.length > 0 ? (
+          <>
+            <View style={estilos.seccionCabecera}>
+              <Text style={[estilos.seccionTitulo, { color: paleta.textoSuave }]}>
+                Transacciones recientes
+              </Text>
+            </View>
+            <View style={[estilos.tarjeta, { backgroundColor: paleta.tarjeta }]}>
+              {recientes.map((reciente) => (
+                <FilaReciente
+                  key={reciente.id ?? `${reciente.fecha}-${reciente.monto}`}
+                  transaccion={reciente}
+                  nombreCategoria={
+                    reciente.categoria_id
+                      ? nombresDeCategoria.get(reciente.categoria_id)
+                      : undefined
+                  }
+                  montosVisibles={montosVisibles}
+                  alEditar={() => setSeleccionada(reciente)}
+                  alEliminar={() => setPendiente(reciente)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
       </ScrollView>
 
       {toastVisible ? (
