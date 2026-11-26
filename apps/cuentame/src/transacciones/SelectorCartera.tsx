@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { paleta } from '../tema/colores';
 import type { Cartera } from '../datos/carteras';
 import type { Transaccion } from '../datos/transacciones';
-import { IconoBilletera } from '../carteras/IconoBilletera';
+import { IconoCartera } from '../carteras/IconoCartera';
 
 type Props = {
   visible: boolean;
@@ -108,7 +108,7 @@ export function SelectorCartera({
                 ) : null}
               </View>
               <View style={estilos.escalaIcono}>
-                <IconoBilletera fondo={paleta.naranjaCartera} />
+                <IconoCartera fondo={paleta.naranjaCartera} />
               </View>
               <View style={estilos.textos}>
                 <Text style={[estilos.nombre, { color: paleta.texto }]} numberOfLines={1}>

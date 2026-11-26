@@ -21,7 +21,7 @@ import { useCarteras } from '../datos/useCarteras';
 import { eliminarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
-import { IconoBilletera } from '../carteras/IconoBilletera';
+import { IconoCartera } from '../carteras/IconoCartera';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { MESES, aISO, deISO } from '../transacciones/fechas';
 
@@ -240,7 +240,7 @@ export function PantallaInicio() {
           {carteras.map((cartera) => (
             <View key={cartera.id ?? cartera.nombre} style={estilos.filaCartera}>
               <View style={estilos.iconoCartera}>
-                <IconoBilletera fondo={paleta.naranjaCartera} />
+                <IconoCartera fondo={paleta.naranjaCartera} />
               </View>
               <Text style={[estilos.nombreCartera, { color: paleta.texto }]} numberOfLines={1}>
                 {cartera.nombre}
