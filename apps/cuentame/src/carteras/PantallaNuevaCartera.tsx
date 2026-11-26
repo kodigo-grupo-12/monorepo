@@ -1,11 +1,11 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { crearCartera } from '../datos/carteras';
 import { paleta } from '../tema/colores';
-import { IconoBilletera } from './IconoBilletera';
+import { IconoCartera } from './IconoCartera';
 
 // Anatomía de Assets/carteras/referencia-pantalla-nueva-cartera.png con las
 // adaptaciones del spec #54: SIN campo Moneda (USD implícito), SIN saldo
@@ -52,7 +52,7 @@ export function PantallaNuevaCartera() {
 
       <View style={[estilos.cuerpo, { paddingBottom: margenes.bottom + 24 }]}>
         <View style={estilos.filaNombre}>
-          <IconoBilletera />
+          <IconoCartera />
           <TextInput
             style={[estilos.entrada, { color: paleta.texto }]}
             value={nombre}

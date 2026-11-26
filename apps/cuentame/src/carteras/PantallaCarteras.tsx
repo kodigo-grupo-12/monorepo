@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+﻿import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -6,7 +6,7 @@ import { useCarteras } from '../datos/useCarteras';
 import type { Cartera } from '../datos/carteras';
 import { useTransacciones } from '../datos/useTransacciones';
 import { paleta } from '../tema/colores';
-import { IconoBilletera } from './IconoBilletera';
+import { IconoCartera } from './IconoCartera';
 
 // Anatomía copiada de Assets/carteras/modelo-pantalla-carteras.png
 // (kodigo-grupo-12/.github): header con flecha de atrás y título, encabezado
@@ -59,7 +59,7 @@ export function PantallaCarteras() {
         {cargando ? null : carteras.map((cartera, indice) => (
           <View key={cartera.id ?? cartera.nombre}>
             <View style={estilos.fila}>
-              <IconoBilletera />
+              <IconoCartera />
               <View style={estilos.textos}>
                 <Text style={[estilos.nombre, { color: paleta.texto }]} numberOfLines={1}>
                   {cartera.nombre}

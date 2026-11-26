@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import {
   Modal,
   Platform,
@@ -21,7 +21,7 @@ import { crearCategoria } from '../datos/categorias';
 import { useCategorias } from '../datos/useCategorias';
 import { crearCartera } from '../datos/carteras';
 import { useCarteras } from '../datos/useCarteras';
-import { IconoBilletera } from '../carteras/IconoBilletera';
+import { IconoCartera } from '../carteras/IconoCartera';
 import { actualizarTransaccion } from '../datos/transacciones';
 import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
@@ -349,7 +349,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
                     setVista('form');
                   }}
                 >
-                  <IconoBilletera />
+                  <IconoCartera />
                   <Text style={[estilos.filaTexto, { color: paleta.texto, flex: 1 }]} numberOfLines={1}>
                     {cartera.nombre}
                   </Text>
@@ -423,7 +423,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion }: Prop
               onPress={() => setVista('cartera')}
             >
               {carteraSeleccionada ? (
-                <IconoBilletera />
+                <IconoCartera />
               ) : (
                 <View style={estilos.billetera}>
                   <View style={estilos.billeteraMoneda} />
