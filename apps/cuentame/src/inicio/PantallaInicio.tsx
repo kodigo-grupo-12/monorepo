@@ -378,12 +378,13 @@ export function PantallaInicio() {
         statusBarTranslucent
         onRequestClose={() => setPendiente(undefined)}
       >
-        <Pressable
-          style={estilos.fondoDialogo}
-          accessibilityLabel="Cerrar"
-          onPress={() => setPendiente(undefined)}
-        >
-          <Pressable style={estilos.tarjetaDialogo}>
+        <View style={estilos.fondoDialogo}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="Cerrar"
+            onPress={() => setPendiente(undefined)}
+          />
+          <View style={estilos.tarjetaDialogo}>
             <Text style={[estilos.tituloDialogo, { color: paleta.texto }]}>¿Eliminar transacción?</Text>
             {pendiente ? (
               <Text style={[estilos.detalleDialogo, { color: paleta.textoSuave }]} numberOfLines={1}>
@@ -412,8 +413,8 @@ export function PantallaInicio() {
                 <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Cancelar</Text>
               </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       <ModalAgregarTransaccion
@@ -489,22 +490,34 @@ function FilaReciente({
 }) {
   const fecha = deISO(transaccion.fecha);
 
+  // En web cada Pressable es un <button>. La papelera va como hermana de
+  // la zona de edición, no adentro: un botón HTML no puede anidar otro.
   return (
-    <Pressable
-      style={estilos.filaReciente}
-      accessibilityRole="button"
-      accessibilityLabel="Editar transacción"
-      onPress={alEditar}
-    >
-      <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
-      <View style={estilos.detallesReciente}>
-        <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
-          {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
+    <View style={estilos.filaReciente}>
+      <Pressable
+        style={estilos.cuerpoReciente}
+        accessibilityRole="button"
+        accessibilityLabel="Editar transacción"
+        onPress={alEditar}
+      >
+        <GlifoCategoria nombre={nombreCategoria ?? transaccion.nota ?? ''} />
+        <View style={estilos.detallesReciente}>
+          <Text style={[estilos.tituloReciente, { color: paleta.texto }]} numberOfLines={1}>
+            {nombreCategoria ?? transaccion.nota ?? (transaccion.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')}
+          </Text>
+          <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
+            {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
+          </Text>
+        </View>
+        <Text
+          style={[
+            estilos.montoReciente,
+            { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
+          ]}
+        >
+          {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
         </Text>
-        <Text style={[estilos.fechaReciente, { color: paleta.textoSuave }]}>
-          {fecha.getDate()} {MESES[fecha.getMonth()]} {fecha.getFullYear()}
-        </Text>
-      </View>
+      </Pressable>
       <Pressable
         style={estilos.papeleraReciente}
         accessibilityRole="button"
@@ -514,15 +527,7 @@ function FilaReciente({
       >
         <GlifoPapelera />
       </Pressable>
-      <Text
-        style={[
-          estilos.montoReciente,
-          { color: transaccion.tipo === 'ingreso' ? paleta.azulMonto : paleta.rojoMonto },
-        ]}
-      >
-        {montosVisibles ? `$${transaccion.monto.toFixed(2)}` : MONTOS_OCULTOS}
-      </Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -726,6 +731,11 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     marginTop: 14,
   },
+  cuerpoReciente: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   detallesReciente: {
     flex: 1,
     marginLeft: 10,
@@ -792,6 +802,7 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+    position: 'relative',
   },
   tarjetaDialogo: {
     width: '100%',
