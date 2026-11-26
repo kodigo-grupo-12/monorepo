@@ -109,8 +109,10 @@ Scripts de administración con `firebase-admin` en `scripts/firestore/`. Contra 
 
 - `marcar-categorias-produccion.mjs`: pone `global: true` en las 14 categorías de producción; si falta alguna, la crea con id `produccion-<slug>`. Idempotente.
 - `borrar-demo-legado.mjs`: lista los datos sin `uid` de la demo compartida anterior y borra solo con `--confirmar`, en lotes de 500.
+- `sembrar-historial.mjs --uid <uid>`: siembra el historial determinista de un uid (98 transacciones y 3 carteras, con la semilla 12 y el día pico del 15 de hace dos meses). Idempotente; `--semilla <n>` y `--hoy AAAA-MM-DD` cambian la generación.
 
-Todos se niegan a correr fuera del emulador sin `--produccion`, y `--produccion` solo se usa con la orden explícita de Roberto, desde su máquina y con credenciales de administración (`gcloud auth application-default login`).
+Todos se niegan a correr fuera del emulador sin `--produccion`, y `--produccion` solo se usa con la orden explícita de Roberto, desde su máquina y con credenciales de administración (`gcloud auth application-default login`). Para `sembrar-historial` en producción, Roberto ya dio permiso para sembrar hasta 100 ejemplos en su cuenta de prueba, pero se corre solo cuando él lo diga.
+
 
 ## Estructura
 

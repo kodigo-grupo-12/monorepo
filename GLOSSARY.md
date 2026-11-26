@@ -130,6 +130,10 @@ _Avoid_: recibo, archivo adjunto
 Los datos que la app crea para cada persona al entrar por primera vez: su cartera Efectivo y 6 transacciones de demo, todas con su uid (`sembrarPrimeraEntrada`).
 _Avoid_: datos de prueba, fixtures
 
+**Historial sembrado**:
+El historial de ejemplo que `scripts/firestore/sembrar-historial.mjs` genera para un uid: 98 transacciones y 3 carteras (Efectivo, Banco y Tarjeta), deterministas con la semilla 12, con el día pico del 15 de hace dos meses.
+_Avoid_: datos de prueba, fixture, historial falso
+
 **Datos demo legados**:
 Los documentos sin uid de la demo compartida anterior: transacciones, carteras y categorías sin uid que no son de producción. Los lista y borra `scripts/firestore/borrar-demo-legado.mjs`, primero simulando y solo con `--confirmar` de verdad.
 _Avoid_: basura, cleanup, residuos
