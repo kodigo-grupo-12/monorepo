@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Presionable } from '../animaciones/Presionable';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -133,8 +133,11 @@ export function PantallaCuenta() {
   const verConfiguracion = () => enrutador.push('/cuenta/configuracion');
   const verAcerca = () => enrutador.push('/cuenta/acerca');
 
-  // Sin confirmación (ADR-0008): al borrar la marca, la guardia del grupo con
-  // sesión manda a la entrada y el splash reinicia el recorrido completo.
+  // Confirmación al cerrar sesión (T013): revierte la decisión 7 de la
+  // T005 (ADR-0008 la declaraba sin confirmación). Al tocar la fila se
+  // pregunta; salir borra la marca y la guardia del grupo con sesión manda
+  // a la entrada, con el splash reiniciando el recorrido completo.
+  const [cerrando, setCerrando] = useState(false);
   const cerrarSesion = async () => {
     await salir();
   };
@@ -178,8 +181,36 @@ export function PantallaCuenta() {
       </View>
 
       <View style={estilos.grupoSalida}>
-        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={cerrarSesion} color={paleta.rojo} />
+        <Fila etiqueta="Cerrar sesión" icono={<IconoApagado />} alTocar={() => setCerrando(true)} color={paleta.rojo} />
       </View>
+
+      {/* Confirmación de salida (T013): misma anatomía del diálogo de
+          eliminar de Inicio. Cancelar vuelve, Salir cierra la sesión. */}
+      <Modal visible={cerrando} transparent animationType="fade" onRequestClose={() => setCerrando(false)}>
+        <View style={estilos.fondoDialogo}>
+          <View style={estilos.tarjetaDialogo}>
+            <Text style={[estilos.tituloDialogo, { color: paleta.texto }]}>¿Seguro que quieres salir?</Text>
+            <View style={estilos.botonesDialogo}>
+              <Pressable
+                style={[estilos.botonDialogo, { backgroundColor: paleta.rojo }]}
+                accessibilityRole="button"
+                accessibilityLabel="Salir"
+                onPress={() => void cerrarSesion()}
+              >
+                <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Salir</Text>
+              </Pressable>
+              <Pressable
+                style={[estilos.botonDialogo, { backgroundColor: paleta.dialogoBoton }]}
+                accessibilityRole="button"
+                accessibilityLabel="Cancelar"
+                onPress={() => setCerrando(false)}
+              >
+                <Text style={[estilos.botonDialogoTexto, { color: paleta.texto }]}>Cancelar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -262,6 +293,40 @@ const estilos = StyleSheet.create({
   grupoSalida: {
     marginTop: 40,
     paddingBottom: 8,
+  },
+  fondoDialogo: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 24,
+  },
+  tarjetaDialogo: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: paleta.tarjeta,
+    borderRadius: 16,
+    padding: 20,
+  },
+  tituloDialogo: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  botonesDialogo: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+  botonDialogo: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  botonDialogoTexto: {
+    fontSize: 16,
+    fontWeight: '700',
   },
   fila: {
     backgroundColor: paleta.tarjeta,
