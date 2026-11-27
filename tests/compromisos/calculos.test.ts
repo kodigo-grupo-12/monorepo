@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   avisoAlBorrar,
   proximosVencimientos,
+  vencimientosApurados,
   sumarDias,
   abonadoDe,
   abonosDe,
@@ -378,5 +379,21 @@ describe('recargoPorCuotas', () => {
     });
     expect(recargoPorCuotas(compromiso({ naturaleza: 'compra', monto: 480 }))).toBeUndefined();
     expect(recargoPorCuotas(compromiso({ monto: 480, precio_contado: 400 }))).toBeUndefined();
+  });
+});
+
+describe('vencimientosApurados', () => {
+  it('deja solo los atrasados y los de hoy', () => {
+    const atrasado = compromiso({ id: 'c1', contraparte: 'Juan', vence: '2026-12-15' });
+    const deHoy = compromiso({ id: 'c2', contraparte: 'Ana', vence: '2026-12-19' });
+    const proximo = compromiso({ id: 'c3', contraparte: 'Beto', vence: '2026-12-26' });
+    const lista = vencimientosApurados([proximo, deHoy, atrasado], [], '2026-12-19');
+    expect(lista.map((v) => v.compromiso.id)).toEqual(['c1', 'c2']);
+    expect(lista.map((v) => v.situacion)).toEqual(['atrasado', 'hoy']);
+  });
+
+  it('sin vencimientos cercanos la lista queda vacía', () => {
+    const lejos = compromiso({ id: 'c1', vence: '2026-12-27' });
+    expect(vencimientosApurados([lejos], [], '2026-12-19')).toEqual([]);
   });
 });
