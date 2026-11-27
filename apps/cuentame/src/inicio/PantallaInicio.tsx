@@ -31,6 +31,10 @@ import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 import { ContadorAnimado } from '../animaciones/ContadorAnimado';
 import { Esqueleto } from '../animaciones/Esqueleto';
 import { useAjustes } from '../ajustes/ProveedorAjustes';
+import { avisoAlBorrar, esMovimientoReal, proximosVencimientos } from '../compromisos/calculos';
+import { TarjetaVencimientos } from '../compromisos/TarjetaVencimientos';
+import { useCompromisos } from '../datos/useCompromisos';
+import { useSesion } from '../sesion/ProveedorSesion';
 
 type Periodo = 'semana' | 'mes';
 
@@ -39,12 +43,29 @@ const DURACION_MS = 180;
 const VISIBLE_MS = 2000;
 const controladorNativo = Platform.OS !== 'web';
 
+// La marca de que ya salió el aviso diario de vencimientos (#137) vive en
+// memoria del módulo, no en Firestore ni AsyncStorage: al recargar la app
+// puede volver a salir.
+let ultimoAviso: { uid: string; hoy: string } | undefined;
+
+// Solo la primera llamada del día con el mismo uid devuelve true.
+function avisarUnaVezPorDia(uid: string, hoy: string): boolean {
+  if (ultimoAviso && ultimoAviso.uid === uid && ultimoAviso.hoy === hoy) {
+    return false;
+  }
+  ultimoAviso = { uid, hoy };
+  return true;
+}
+
 export function PantallaInicio() {
   const enrutador = useRouter();
   const margenes = useSafeAreaInsets();
   const { transacciones, cargando, error } = useTransacciones();
   const { categorias } = useCategorias();
   const { carteras } = useCarteras();
+  const { compromisos, cargando: cargandoCompromisos } = useCompromisos();
+  const { usuario } = useSesion();
+  const uid = usuario?.uid;
   const nombresDeCategoria = new Map(categorias.map((categoria) => [categoria.id, categoria.nombre]));
 
   // El ojito (T010): alterna montos ↔ ***** en todo el Inicio por
@@ -130,6 +151,30 @@ export function PantallaInicio() {
     };
   }, [enrutador]);
 
+  // Aviso diario de vencimientos (#137): una vez por día y por uid, con el
+  // tipo y la acción del issue. El canal de la T013 ya respeta el ajuste de
+  // avisos in-app de Configuraciones.
+  useEffect(() => {
+    if (cargando || cargandoCompromisos || !uid) {
+      return;
+    }
+    const hoy = hoyISO();
+    const apurados = proximosVencimientos(compromisos, transacciones, hoy).filter(
+      (vencimiento) => vencimiento.situacion === 'atrasado' || vencimiento.situacion === 'hoy',
+    );
+    if (apurados.length === 0 || !avisarUnaVezPorDia(uid, hoy)) {
+      return;
+    }
+    mostrarAviso({
+      mensaje:
+        apurados.length === 1
+          ? 'Tenés 1 deuda o préstamo que vence hoy o está atrasado'
+          : `Tenés ${apurados.length} deudas o préstamos que vencen hoy o están atrasados`,
+      tipo: apurados.some((vencimiento) => vencimiento.situacion === 'atrasado') ? 'error' : 'exito',
+      accion: { etiqueta: 'Ver', alTocar: () => enrutador.push('/deudas') },
+    });
+  }, [compromisos, transacciones, cargando, cargandoCompromisos, uid, enrutador]);
+
   // ADR-0011: el saldo nunca vive en el documento, se agrega en vivo desde
   // el snapshot. Balance total = todas las transacciones; cada cartera, las
   // suyas.
@@ -182,8 +227,10 @@ export function PantallaInicio() {
   );
   const enConjunto = new Set(dias);
   const enConjuntoAnterior = new Set(diasAnteriores);
+  // El análisis usa solo movimientos reales (ADR-0019): un préstamo no es gasto ni ingreso, aunque sí mueve el saldo.
+  const reales = transacciones.filter(esMovimientoReal);
   const gastoEn = (conjunto: Set<string>): number =>
-    transacciones.reduce(
+    reales.reduce(
       (total, transaccion) =>
         transaccion.tipo === 'gasto' && conjunto.has(transaccion.fecha) ? total + transaccion.monto : total,
       0,
@@ -191,7 +238,7 @@ export function PantallaInicio() {
   const gastoActual = gastoEn(enConjunto);
   const gastoAnterior = gastoEn(enConjuntoAnterior);
   const gastoPorDia = dias.map((iso) =>
-    transacciones.reduce(
+    reales.reduce(
       (total, transaccion) =>
         transaccion.tipo === 'gasto' && transaccion.fecha === iso ? total + transaccion.monto : total,
       0,
@@ -225,7 +272,7 @@ export function PantallaInicio() {
   const conjuntoMesGasto = new Set(diasDe('mes', new Date()));
   const gastoPorCategoria = new Map<string, number>();
   let gastoTotalGasto = 0;
-  for (const transaccion of transacciones) {
+  for (const transaccion of reales) {
     if (transaccion.tipo !== 'gasto' || !conjuntoMesGasto.has(transaccion.fecha)) {
       continue;
     }
@@ -289,6 +336,8 @@ export function PantallaInicio() {
     opacidadSaldo.setValue(0.25);
     Animated.timing(opacidadSaldo, { toValue: 1, duration: 220, useNativeDriver: true }).start();
   }, [montosVisibles, ajustes.animaciones, opacidadSaldo]);
+
+  const avisoBorrado = pendiente ? avisoAlBorrar(pendiente, compromisos) : undefined;
 
   return (
     <View style={[estilos.contenedor, { backgroundColor: paleta.fondo, paddingTop: margenes.top }]}>
@@ -362,6 +411,8 @@ export function PantallaInicio() {
             </View>
           ))}
         </View>
+
+        <TarjetaVencimientos compromisos={compromisos} transacciones={transacciones} />
 
         {/* Reportar este mes: el enlace lanza el toast global; no hay
             pantalla de informes en esta pasada. */}
@@ -594,6 +645,9 @@ export function PantallaInicio() {
               <Text style={[estilos.detalleDialogo, { color: paleta.textoSuave }]} numberOfLines={1}>
                 {pendiente.nota ?? (pendiente.tipo === 'ingreso' ? 'Ingreso' : 'Gasto')} · ${pendiente.monto.toFixed(2)}
               </Text>
+            ) : null}
+            {avisoBorrado ? (
+              <Text style={[estilos.detalleDialogo, { color: paleta.textoSuave }]}>{avisoBorrado}</Text>
             ) : null}
             <View style={estilos.botonesDialogo}>
               <Pressable

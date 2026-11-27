@@ -29,7 +29,8 @@ import { mostrarAviso } from '../avisos/avisos';
 import { actualizarCompromiso, crearCompromiso } from '../datos/compromisos';
 import type { Compromiso as CompromisoDoc, Direccion, Naturaleza } from '../datos/compromisos';
 import { contraparteValida, normalizarTelefono } from '../compromisos/contraparte';
-import { abonadoDe, validarNuevoMonto } from '../compromisos/calculos';
+import { abonadoDe, notaDeOrigen, validarNuevoMonto } from '../compromisos/calculos';
+import { useCompromisos } from '../datos/useCompromisos';
 import { useTransacciones } from '../datos/useTransacciones';
 
 const TOPE_B64 = 700 * 1024;
@@ -118,6 +119,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
   const [conOrigen, setConOrigen] = useState(true);
 
   const { categorias } = useCategorias();
+  const { compromisos } = useCompromisos();
   // En «Deuda/Préstamo» la lista de categorías sale de la naturaleza: una
   // compra con debo lista las de gasto y con me_deben las de ingreso; con
   // dinero no hay categoría.
@@ -133,6 +135,14 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
   const categoriaSeleccionada = categorias.find((categoria) => categoria.id === categoriaId);
   const { carteras } = useCarteras();
   const carteraSeleccionada = carteras.find((cartera) => cartera.id === carteraId);
+
+  // Transacción amarrada a un compromiso (#136): no cambia de tipo, se sabe
+  // parte de «Deudas y préstamos» y, si es neutral, no necesita categoría.
+  const amarrada = !!transaccion?.compromiso_id;
+  const compromisoAmarrado = amarrada
+    ? compromisos.find((c) => c.id === transaccion?.compromiso_id)
+    : undefined;
+  const amarradaNeutral = amarrada && transaccion?.neutral === true;
   const { transacciones } = useTransacciones();
 
   // Crear arranca limpio; editar precarga el documento tocado. La fecha se
@@ -144,6 +154,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
     }
     if (transaccion) {
       setTipo(transaccion.tipo);
+      setSegmento(transaccion.tipo);
       setMontoTexto(`${transaccion.monto}`);
       setNotaTexto(transaccion.nota ?? '');
       setFoto(transaccion.imagen);
@@ -237,7 +248,10 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
       : naturaleza === 'dinero'
         ? !conOrigen || !!carteraId
         : !!categoriaId);
-  const listo = segmento === 'compromiso' ? compromisoValido : montoValido && !!categoriaId && !!carteraId;
+  const listo =
+    segmento === 'compromiso'
+      ? compromisoValido
+      : montoValido && !!carteraId && (amarradaNeutral || !!categoriaId);
 
   async function elegirFoto() {
     const resultado = await SelectorImagen.launchImageLibraryAsync({
@@ -349,7 +363,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
       }
       return;
     }
-    if (!montoValido || !categoriaId || !carteraId || guardando) {
+    if (!montoValido || !carteraId || (!amarradaNeutral && !categoriaId) || guardando) {
       return;
     }
     if (enEdicion && transaccion?.id) {
@@ -556,6 +570,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
           </ScrollView>
         ) : (
           <ScrollView style={estilos.cuerpo} contentContainerStyle={estilos.contenido} keyboardShouldPersistTaps="handled">
+            {amarrada ? (
+              <Text style={[estilos.avisoAmarre, { color: paleta.textoSuave }]}>
+                {compromisoAmarrado
+                  ? `Es parte de «Deudas y préstamos» (${notaDeOrigen(compromisoAmarrado)}). El monto del compromiso se corrige en su detalle.`
+                  : 'Es parte de «Deudas y préstamos».'}
+              </Text>
+            ) : null}
             {!enEdicionCompromiso ? (
             <View style={estilos.selector}>
               {(enEdicion
@@ -564,9 +585,14 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
               ).map((valor) => (
                 <Pressable
                   key={valor}
-                  style={[estilos.segmento, segmento === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 }]}
+                  style={[
+                    estilos.segmento,
+                    segmento === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 },
+                    amarrada && { opacity: 0.4 },
+                  ]}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: segmento === valor }}
+                  accessibilityState={{ selected: segmento === valor, disabled: amarrada }}
+                  disabled={amarrada}
                   onPress={() => {
                     if (valor === 'compromiso') {
                       setSegmento('compromiso');
@@ -631,6 +657,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
               />
             </View>
 
+            {!amarradaNeutral ? (
             <Pressable
               style={estilos.fila}
               accessibilityRole="button"
@@ -652,6 +679,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
               </Text>
               <View style={estilos.chevron} />
             </Pressable>
+            ) : null}
 
             <View style={estilos.fila}>
               <View style={estilos.notas}>
@@ -1066,6 +1094,12 @@ const estilos = StyleSheet.create({
   },
   contenido: {
     paddingBottom: 8,
+  },
+  avisoAmarre: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginHorizontal: 16,
+    marginBottom: 4,
   },
   selector: {
     flexDirection: 'row',
