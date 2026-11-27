@@ -157,6 +157,16 @@ export function montoDeCuota(cuota: Cuota): number {
     : Math.max(0, cuota.esperado - cuota.pagado);
 }
 
+// ¿El monto deja la última cuota del plan fijo en 0 o menos? Es la misma
+// aritmética en centavos que valida el modal, para que la escritura
+// rechace lo mismo que la pantalla (#155). Un plan variable nunca rompe.
+export function montoRompeElPlan(plan: Plan, monto: number): boolean {
+  if (plan.modo !== 'fijo' || plan.cuota === undefined) {
+    return false;
+  }
+  return enCentavos(monto) - enCentavos(plan.cuota) * (plan.numero_cuotas - 1) <= 0;
+}
+
 // El atraso del compromiso con plan es el de su cuota atrasada más vieja.
 export function atrasoDePlan(
   compromiso: Compromiso,

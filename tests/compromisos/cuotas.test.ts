@@ -5,6 +5,7 @@ import {
   cuotasDe,
   fechaDeCuota,
   montosDeCuotas,
+  montoRompeElPlan,
   proximaCuota,
 } from '../../apps/cuentame/src/compromisos/cuotas';
 import { estadoDe, proximosVencimientos } from '../../apps/cuentame/src/compromisos/calculos';
@@ -208,5 +209,28 @@ describe('estadoDe y proximosVencimientos con plan', () => {
       fecha: '2027-02-19',
       pendiente: 20,
     });
+  });
+});
+
+describe('montoRompeElPlan', () => {
+  const fijo12: Plan = { modo: 'fijo', cuota: 20, numero_cuotas: 12, dia: 19, primera: '2026-12' };
+  const variable: Plan = { modo: 'variable', numero_cuotas: 12, dia: 19, primera: '2026-12' };
+  const fijo1: Plan = { modo: 'fijo', cuota: 20, numero_cuotas: 1, dia: 19, primera: '2026-12' };
+
+  it('monto 200 con cuota 20 y 12 cuotas deja la última en -20: rompe', () => {
+    expect(montoRompeElPlan(fijo12, 200)).toBe(true);
+  });
+
+  it('el límite exacto (220 deja la última en 0) también rompe', () => {
+    expect(montoRompeElPlan(fijo12, 220)).toBe(true);
+  });
+
+  it('monto 221 deja la última cuota en 1.00: no rompe', () => {
+    expect(montoRompeElPlan(fijo12, 221)).toBe(false);
+  });
+
+  it('un plan variable nunca rompe y una sola cuota con monto positivo tampoco', () => {
+    expect(montoRompeElPlan(variable, 5)).toBe(false);
+    expect(montoRompeElPlan(fijo1, 5)).toBe(false);
   });
 });

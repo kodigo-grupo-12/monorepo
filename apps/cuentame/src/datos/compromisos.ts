@@ -1,11 +1,12 @@
 // Tipos y escrituras del compromiso de «Deudas y préstamos» (spec #130).
 // Nada de lo que es suma se guarda: lo abonado, lo pendiente y el estado se
 // calculan en compromisos/calculos.ts (ADR-0019).
-import { collection, deleteField, doc, updateDoc } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, updateDoc } from 'firebase/firestore';
 
 import { armarBatchCompromiso, COLECCION_COMPROMISOS, type DatosNuevoCompromiso } from './consultas';
 import { datosDeAbono, type DatosAbono } from '../compromisos/calculos';
 import { armarBatchBorrado } from './consultas';
+import { montoRompeElPlan } from '../compromisos/cuotas';
 import { crearTransaccion, type Transaccion } from './transacciones';
 import { db } from './firebase';
 import { uidDeSesion } from '../sesion/auth';
@@ -37,6 +38,16 @@ export async function actualizarCompromiso(
   id: string,
   cambios: Pick<Compromiso, 'contraparte' | 'telefono' | 'monto' | 'vence' | 'nota' | 'precio_contado'>,
 ): Promise<void> {
+  if (cambios.monto !== undefined) {
+    // El plan vigente se lee del documento: la escritura es la frontera que
+    // impide guardar un monto que rompe el plan fijo (#155). cuotasDe sigue
+    // lanzando como invariante y los lectores no llevan try/catch.
+    const actual = await getDoc(doc(db, COLECCION_COMPROMISOS, id));
+    const plan = actual.data()?.plan as Compromiso['plan'];
+    if (plan && montoRompeElPlan(plan, cambios.monto)) {
+      throw new Error('El monto deja la última cuota del plan fijo en 0 o menos');
+    }
+  }
   const documento: Record<string, unknown> = {};
   for (const campo of ['contraparte', 'telefono', 'monto', 'vence', 'nota', 'precio_contado'] as const) {
     const valor = cambios[campo];
