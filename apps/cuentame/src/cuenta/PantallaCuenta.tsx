@@ -127,11 +127,11 @@ export function PantallaCuenta() {
   // modo lectura y Mis carteras es la misma pantalla de siempre; Acerca y
   // Configuraciones son pantallas nuevas locales. Soporte sigue con el
   // placeholder porque no tiene pantalla todavía.
-  const verCategorias = () => enrutador.push('/cuenta/categorias');
+  const verCategorias = () => enrutador.push('/(sesion)/cuenta/categorias');
   const verCarteras = () => enrutador.push('/carteras');
-  const verDeudas = () => enrutador.push('/deudas');
-  const verConfiguracion = () => enrutador.push('/cuenta/configuracion');
-  const verAcerca = () => enrutador.push('/cuenta/acerca');
+  const verDeudas = () => enrutador.push('/(sesion)/deudas');
+  const verConfiguracion = () => enrutador.push('/(sesion)/cuenta/configuracion');
+  const verAcerca = () => enrutador.push('/(sesion)/cuenta/acerca');
 
   // Confirmación al cerrar sesión (T013): revierte la decisión 7 de la
   // T005 (ADR-0008 la declaraba sin confirmación). Al tocar la fila se
