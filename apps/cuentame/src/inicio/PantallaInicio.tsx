@@ -31,7 +31,7 @@ import { BannerSincronizacion } from '../avisos/BannerSincronizacion';
 import { ContadorAnimado } from '../animaciones/ContadorAnimado';
 import { Esqueleto } from '../animaciones/Esqueleto';
 import { useAjustes } from '../ajustes/ProveedorAjustes';
-import { avisoAlBorrar, esMovimientoReal, proximosVencimientos } from '../compromisos/calculos';
+import { avisoAlBorrar, esMovimientoReal, vencimientosApurados } from '../compromisos/calculos';
 import { TarjetaVencimientos } from '../compromisos/TarjetaVencimientos';
 import { useCompromisos } from '../datos/useCompromisos';
 import { useSesion } from '../sesion/ProveedorSesion';
@@ -159,9 +159,7 @@ export function PantallaInicio() {
       return;
     }
     const hoy = hoyISO();
-    const apurados = proximosVencimientos(compromisos, transacciones, hoy).filter(
-      (vencimiento) => vencimiento.situacion === 'atrasado' || vencimiento.situacion === 'hoy',
-    );
+    const apurados = vencimientosApurados(compromisos, transacciones, hoy);
     if (apurados.length === 0 || !avisarUnaVezPorDia(uid, hoy)) {
       return;
     }

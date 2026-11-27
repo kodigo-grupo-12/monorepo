@@ -163,6 +163,19 @@ export function proximosVencimientos(
 }
 
 // Días enteros entre dos fechas AAAA-MM-DD, 0 si hoy no es mayor que desde.
+// Los vencimientos que piden atención hoy (#137): los atrasados y los que
+// vencen hoy. La usa el aviso diario de Inicio y el badge del navbar, para
+// que los dos lean del mismo cálculo.
+export function vencimientosApurados(
+  compromisos: Compromiso[],
+  transacciones: Transaccion[],
+  hoy: string,
+): Vencimiento[] {
+  return proximosVencimientos(compromisos, transacciones, hoy).filter(
+    (vencimiento) => vencimiento.situacion === 'atrasado' || vencimiento.situacion === 'hoy',
+  );
+}
+
 export function diasDeAtraso(desde: string, hoy: string): number {
   if (hoy <= desde) {
     return 0;
