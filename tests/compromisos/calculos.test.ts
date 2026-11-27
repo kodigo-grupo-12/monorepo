@@ -49,6 +49,17 @@ describe('montoBaseDe', () => {
   });
 });
 
+describe('montoBaseDe con plan', () => {
+  it('con plan el monto es el total financiado y manda', () => {
+    expect(
+      montoBaseDe(
+        compromiso({ naturaleza: 'compra', precio_contado: 400, monto: 480, plan: { modo: 'fijo', cuota: 20, numero_cuotas: 24, dia: 19, primera: '2026-12' } }),
+      ),
+    ).toBe(480);
+    expect(montoBaseDe(compromiso({ naturaleza: 'compra', precio_contado: 100, monto: undefined }))).toBe(100);
+  });
+});
+
 describe('esMovimientoReal', () => {
   it('un movimiento neutral no es real y el resto sí', () => {
     expect(esMovimientoReal(transaccion({ neutral: true }))).toBe(false);

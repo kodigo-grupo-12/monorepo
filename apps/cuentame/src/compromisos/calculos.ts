@@ -5,6 +5,7 @@
 import type { Compromiso } from '../datos/compromisos';
 import type { DatosNuevaTransaccion } from '../datos/consultas';
 import type { Transaccion } from '../datos/transacciones';
+import { cuotasDe, type Cuota } from './cuotas';
 
 export function notaDeOrigen(compromiso: Pick<Compromiso, 'direccion' | 'contraparte'>): string {
   return compromiso.direccion === 'me_deben'
@@ -44,8 +45,12 @@ export function abonadoDe(compromisoId: string, transacciones: Transaccion[]): n
 }
 
 // El monto que representa el compromiso: para la compra es su precio de
-// contado (#137); para el dinero, su monto.
+// contado (#137); para el dinero, su monto. Con plan el monto es el total
+// financiado y manda (#138): el pendiente total sigue siendo monto − abonado.
 export function montoBaseDe(compromiso: Compromiso): number {
+  if (compromiso.plan) {
+    return compromiso.monto ?? 0;
+  }
   return compromiso.naturaleza === 'compra' ? compromiso.precio_contado ?? 0 : compromiso.monto ?? 0;
 }
 
@@ -66,6 +71,13 @@ export function estadoDe(
   }
   if (pendienteDe(compromiso, transacciones) === 0) {
     return 'cerrado';
+  }
+  if (compromiso.plan) {
+    // Con plan el vencido lo manda la cuota atrasada más vieja (#138).
+    if (cuotasDe(compromiso, transacciones, hoy).some((cuota) => cuota.estado === 'atrasada')) {
+      return 'vencido';
+    }
+    return 'activo';
   }
   if (compromiso.vence && hoy > compromiso.vence) {
     return 'vencido';
@@ -89,11 +101,19 @@ export interface Vencimiento {
   pendiente: number;
   situacion: 'atrasado' | 'hoy' | 'proximo';
   diasAtraso: number;
+  numero?: number; // número de la cuota cuando el compromiso tiene plan (#138)
+  totalCuotas?: number; // n del plan: la fila lee «Cuota k de n»
 }
 
 // Lo que vence hoy o en los próximos dias días (#137), atrasados primero por
-// fecha. Solo abiertos con vence dentro de la ventana. La fase 2 (#138) le
-// agrega las cuotas.
+// fecha. Sin plan entra el compromiso con su vence; con plan (#138) entran
+// cada cuota atrasada y la próxima cuota si vence dentro de la ventana, con
+// el pendiente de la cuota (esperado − pagado, o referencia − pagado).
+function pendienteDeCuota(cuota: Cuota): number {
+  const esperado = cuota.esperado ?? cuota.referencia;
+  return Math.max(0, enCentavos(esperado) - enCentavos(cuota.pagado)) / 100;
+}
+
 export function proximosVencimientos(
   compromisos: Compromiso[],
   transacciones: Transaccion[],
@@ -101,25 +121,45 @@ export function proximosVencimientos(
   dias = 7,
 ): Vencimiento[] {
   const limite = sumarDias(hoy, dias);
-  return compromisos
-    .filter(
-      (c) =>
-        c.vence !== undefined &&
-        c.vence <= limite &&
-        estaAbierto(estadoDe(c, transacciones, hoy)) &&
-        pendienteDe(c, transacciones) > 0,
-    )
-    .map((c) => {
-      const atraso = diasDeAtraso(c.vence!, hoy);
-      return {
+  const resultados: Vencimiento[] = [];
+  for (const c of compromisos) {
+    if (!estaAbierto(estadoDe(c, transacciones, hoy))) {
+      continue;
+    }
+    if (c.plan) {
+      for (const cuota of cuotasDe(c, transacciones, hoy)) {
+        const falta = pendienteDeCuota(cuota);
+        if (cuota.estado === 'pagada' || falta <= 0) {
+          continue;
+        }
+        if (cuota.estado !== 'atrasada' && cuota.vence > limite) {
+          continue;
+        }
+        resultados.push({
+          compromiso: c,
+          fecha: cuota.vence,
+          pendiente: falta,
+          situacion:
+            cuota.estado === 'atrasada' ? 'atrasado' : cuota.vence === hoy ? 'hoy' : 'proximo',
+          diasAtraso: cuota.diasAtraso,
+          numero: cuota.numero,
+          totalCuotas: c.plan.numero_cuotas,
+        });
+      }
+      continue;
+    }
+    if (c.vence !== undefined && c.vence <= limite && pendienteDe(c, transacciones) > 0) {
+      const atraso = diasDeAtraso(c.vence, hoy);
+      resultados.push({
         compromiso: c,
-        fecha: c.vence!,
+        fecha: c.vence,
         pendiente: pendienteDe(c, transacciones),
         situacion: atraso > 0 ? 'atrasado' : c.vence === hoy ? 'hoy' : 'proximo',
         diasAtraso: atraso,
-      } as Vencimiento;
-    })
-    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+      });
+    }
+  }
+  return resultados.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
 }
 
 // Días enteros entre dos fechas AAAA-MM-DD, 0 si hoy no es mayor que desde.
