@@ -166,7 +166,14 @@ export async function preguntar({
         mensajes,
       });
     } catch (error) {
-      return { tipo: 'respuesta', texto: mensajeDeErrorDelAgente(error), historial: mensajes };
+      // El error traducido también es un mensaje del Agente en el historial:
+      // si no, la pantalla no pinta nada y el fallo queda invisible (#https://github.com/kodigo-grupo-12/monorepo/issues/159).
+      const mensaje = mensajeDeErrorDelAgente(error);
+      return {
+        tipo: 'respuesta',
+        texto: mensaje,
+        historial: [...mensajes, { rol: 'modelo', texto: mensaje }],
+      };
     }
     if (respuesta.tipo === 'texto') {
       return {
@@ -176,7 +183,11 @@ export async function preguntar({
       };
     }
     if (rondasUsadas >= TOPE_RONDAS) {
-      return { tipo: 'respuesta', texto: MENSAJE_TOPE, historial: mensajes };
+      return {
+        tipo: 'respuesta',
+        texto: MENSAJE_TOPE,
+        historial: [...mensajes, { rol: 'modelo', texto: MENSAJE_TOPE }],
+      };
     }
     rondasUsadas += 1;
     const resultados = respuesta.llamadas.map((llamada) => ({

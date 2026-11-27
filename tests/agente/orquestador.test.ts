@@ -138,6 +138,7 @@ describe('preguntar', () => {
     expect(modelo.peticiones.length).toBe(5);
     const rondasDeResultados = (mensaje: MensajeAgente): boolean => mensaje.rol === 'herramienta';
     expect(modelo.peticiones[4].mensajes.filter(rondasDeResultados).length).toBe(4);
+    expect(respuesta.historial.at(-1)).toEqual({ rol: 'modelo', texto: 'No pude calcularlo con mis herramientas. Probá con una pregunta más concreta.' });
   });
 
   it('al modelo nunca llegan notas, imágenes, fotos ni transacciones crudas', async () => {
@@ -195,6 +196,20 @@ describe('preguntar', () => {
     ]) {
       expect(mensajeDeErrorDelAgente(error)).not.toMatch(/429|RESOURCE_EXHAUSTED|FETCH_ERROR|API_NOT_ENABLED/);
     }
+  });
+
+  it('cuando el modelo falla, el error llega como burbuja del Agente en el historial', async () => {
+    const error = new Error('se cayó la red');
+    const modelo = new ModeloFalso().conGuion(error);
+
+    const respuesta = await preguntar({ pregunta: 'x', historial: [], datos: DATOS, cargando: false, ahora: AHORA, modelo });
+
+    expect(respuesta.tipo).toBe('respuesta');
+    if (respuesta.tipo !== 'respuesta') {
+      throw new Error('Debió devolver una respuesta.');
+    }
+    expect(respuesta.historial.at(-1)).toEqual({ rol: 'modelo', texto: mensajeDeErrorDelAgente(error) });
+    expect(respuesta.historial).toContainEqual({ rol: 'persona', texto: 'x' });
   });
 
   it('con cargando en true devuelve esperando y el modelo no recibe ninguna llamada', async () => {

@@ -147,6 +147,19 @@ export function PantallaAgente() {
           placeholder="Pregúntale algo sobre tu dinero…"
           placeholderTextColor={paleta.textoSuave}
           multiline
+          // En web Enter envía (react-native-web nunca llama onSubmitEditing
+          // en multiline) y Shift+Enter deja el salto de línea; en Android e
+          // iOS el Enter sigue insertando salto de línea (#https://github.com/kodigo-grupo-12/monorepo/issues/159).
+          onKeyPress={(evento) => {
+            if (Platform.OS !== 'web' || evento.nativeEvent.key !== 'Enter') {
+              return;
+            }
+            if ((evento.nativeEvent as unknown as { shiftKey?: boolean }).shiftKey) {
+              return;
+            }
+            evento.preventDefault();
+            void enviar(texto);
+          }}
           accessibilityLabel="Pregunta para el Agente"
         />
         <Pressable
