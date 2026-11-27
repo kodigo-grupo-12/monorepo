@@ -149,6 +149,14 @@ export function proximaCuota(cuotas: Cuota[]): Cuota | undefined {
   return cuotas.find((cuota) => cuota.estado !== 'pagada');
 }
 
+// Lo que toca pagar de una cuota: en fijo, lo que falta de su esperado; en
+// variable, la referencia (#139).
+export function montoDeCuota(cuota: Cuota): number {
+  return cuota.esperado === null
+    ? cuota.referencia
+    : Math.max(0, cuota.esperado - cuota.pagado);
+}
+
 // El atraso del compromiso con plan es el de su cuota atrasada más vieja.
 export function atrasoDePlan(
   compromiso: Compromiso,

@@ -18,15 +18,18 @@ type Props = {
 // Etiqueta de la fila: «Atrasado · N días» en rojo, «Vence hoy» en
 // amarillo o «Vence 19 dic» para lo que viene.
 function etiquetaDe(vencimiento: Vencimiento): { texto: string; color: string } {
+  const cuota = vencimiento.numero
+    ? `Cuota ${vencimiento.numero} de ${vencimiento.totalCuotas} · `
+    : '';
   if (vencimiento.situacion === 'atrasado') {
     const dias = vencimiento.diasAtraso === 1 ? '1 día' : `${vencimiento.diasAtraso} días`;
-    return { texto: `Atrasado · ${dias}`, color: paleta.rojoMonto };
+    return { texto: `${cuota}Atrasado · ${dias}`, color: paleta.rojoMonto };
   }
   if (vencimiento.situacion === 'hoy') {
-    return { texto: 'Vence hoy', color: paleta.amarilloCambio };
+    return { texto: `${cuota}Vence hoy`, color: paleta.amarilloCambio };
   }
   const [, mes, dia] = vencimiento.fecha.split('-').map(Number);
-  return { texto: `Vence ${dia} ${MESES_CORTOS[mes - 1]}`, color: paleta.textoSuave };
+  return { texto: `${cuota}Vence ${dia} ${MESES_CORTOS[mes - 1]}`, color: paleta.textoSuave };
 }
 
 // Tarjeta de vencimientos de Inicio (#137): lo atrasado, lo que vence hoy y
