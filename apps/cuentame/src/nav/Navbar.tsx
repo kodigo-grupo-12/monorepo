@@ -1,23 +1,36 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { paleta } from '../tema/colores';
+import { vencimientosApurados } from '../compromisos/calculos';
+import { hoyISO } from '../transacciones/fechas';
+import { useCompromisos } from '../datos/useCompromisos';
+import { useTransacciones } from '../datos/useTransacciones';
 
-const glifoAgente = require('../../assets/glifos/agente.png');
+const glifoAgente = require('../../assets/glifos/agente-robot.png');
+const glifoAgenteActivo = require('../../assets/glifos/agente-robot-activo.png');
 
-// Anatomía copiada de navbar-template.png (kodigo-grupo-12/.github, Assets/navbar):
-// cinco posiciones en el orden del modelo. El tab activo sale de la ruta y
-// tocar navega. Los glifos van dibujados con vistas, salvo el del Agente, que
-// es un asset del proyecto: Expo SDK 58 ya no trae un set de iconos y no se
-// agrega ninguna dependencia nueva ni nada se pide por URL.
+// Anatomía del rediseño aprobado el 2026-11-26 (issue #157): barra oscura
+// con hairline separadora, cuatro tab con etiquetas, activo en verde con
+// punto, + central prominente elevado sobre el borde y badge de
+// vencimientos sobre Inicio. El tab activo sale de la ruta y tocar navega.
+// Los glifos van dibujados con vistas, salvo el del Agente, que es un asset
+// del proyecto (en dos tintas: inactivo y activo): Expo SDK 58 ya no trae
+// un set de iconos y no se agrega ninguna dependencia nueva ni nada se
+// pide por URL.
+
+// En pantallas anchas (web) el contenido se centra con este tope en vez de
+// estirarse de borde a borde: centrado, con poca separación de los bordes.
+const ANCHO_CONTENIDO = 560;
+const DESDE_ANCHO = 768;
 
 type PropsGlifo = { activo?: boolean };
 
 function GlifoInicio({ activo = false }: PropsGlifo) {
-  const color = activo ? paleta.texto : paleta.textoSuave;
+  const color = activo ? paleta.verdeLogin : paleta.textoSuave;
 
   return (
     <View style={estilos.glifo}>
@@ -39,7 +52,7 @@ function GlifoInicio({ activo = false }: PropsGlifo) {
 }
 
 function GlifoTransacciones({ activo = false }: PropsGlifo) {
-  const color = activo ? paleta.texto : paleta.textoSuave;
+  const color = activo ? paleta.verdeLogin : paleta.textoSuave;
 
   return (
     <View style={estilos.glifo}>
@@ -56,10 +69,11 @@ function GlifoTransacciones({ activo = false }: PropsGlifo) {
 }
 
 function GlifoAgente({ activo = false }: PropsGlifo) {
-  // El inactivo se atenúa para leerse en los dos estados con el mismo asset.
+  // El robot va en dos tintas (inactivo y activo) y el inactivo además se
+  // atenúa, para leerse bien en los dos estados.
   return (
     <Image
-      source={glifoAgente}
+      source={activo ? glifoAgenteActivo : glifoAgente}
       style={[estilos.glifoAgente, { opacity: activo ? 1 : 0.55 }]}
       contentFit="contain"
     />
@@ -67,7 +81,7 @@ function GlifoAgente({ activo = false }: PropsGlifo) {
 }
 
 function GlifoCuenta({ activo = false }: PropsGlifo) {
-  const color = activo ? paleta.texto : paleta.textoSuave;
+  const color = activo ? paleta.verdeLogin : paleta.textoSuave;
 
   return (
     <View style={estilos.glifo}>
@@ -116,6 +130,11 @@ function Posicion({
       >
         {etiqueta}
       </Text>
+      {/* El punto del tab activo: la ranura existe en los dos estados para
+          que todos los tab midan lo mismo. */}
+      <View
+        style={[estilos.puntoActivo, { backgroundColor: activa ? paleta.verdeLogin : 'transparent' }]}
+      />
     </Pressable>
   );
 }
@@ -124,6 +143,9 @@ export function Navbar({ alTocarCentral }: { alTocarCentral?: () => void }) {
   const margenes = useSafeAreaInsets();
   const camino = usePathname();
   const enrutador = useRouter();
+  const ancho = useWindowDimensions().width;
+  const { compromisos, cargando: cargandoCompromisos } = useCompromisos();
+  const { transacciones, cargando: cargandoTransacciones } = useTransacciones();
 
   // Las pantallas empujadas dentro del tab Cuenta (ADR-0011) mantienen a
   // Cuenta como tab activo.
@@ -134,57 +156,80 @@ export function Navbar({ alTocarCentral }: { alTocarCentral?: () => void }) {
     camino === '/carteras' ||
     camino === '/nueva-cartera';
 
-  // El tab activo sale de la ruta: tocar un tab navega y el placeholder
-  // compartido responde. El botón central abre el modal «Agregar
-  // transacción», revocando el no-hacer-nada de la T005.
+  // El badge de Inicio (#157): vencimientos de hoy o atrasados, la misma
+  // lógica del aviso diario (#137), una sola fuente de verdad.
+  const apurados =
+    cargandoCompromisos || cargandoTransacciones
+      ? []
+      : vencimientosApurados(compromisos, transacciones, hoyISO());
+
   return (
     <View style={[estilos.barra, { paddingBottom: 6 + margenes.bottom }]}>
-      <Posicion
-        etiqueta="Inicio"
-        activa={camino === '/inicio'}
-        alTocar={() => enrutador.navigate('/inicio')}
-      >
-        <GlifoInicio activo={camino === '/inicio'} />
-      </Posicion>
-      <Posicion
-        etiqueta="Transacciones"
-        activa={camino === '/transacciones'}
-        alTocar={() => enrutador.navigate('/transacciones')}
-      >
-        <GlifoTransacciones activo={camino === '/transacciones'} />
-      </Posicion>
-      <View style={[estilos.posicion, estilos.posicionCentral]}>
-        <Pressable
-          style={estilos.botonCentral}
-          accessibilityRole="button"
-          accessibilityLabel="Nueva transacción"
-          onPress={alTocarCentral}
+      <View style={[estilos.contenido, ancho >= DESDE_ANCHO && estilos.contenidoCentrado]}>
+        <Posicion
+          etiqueta="Inicio"
+          activa={camino === '/inicio'}
+          alTocar={() => enrutador.navigate('/inicio')}
         >
-          <Text style={estilos.mas}>+</Text>
-        </Pressable>
+          <View>
+            <GlifoInicio activo={camino === '/inicio'} />
+            {apurados.length > 0 ? (
+              <View style={estilos.insignia}>
+                <Text style={estilos.insigniaTexto}>{apurados.length}</Text>
+              </View>
+            ) : null}
+          </View>
+        </Posicion>
+        <Posicion
+          etiqueta="Transacciones"
+          activa={camino === '/transacciones'}
+          alTocar={() => enrutador.navigate('/transacciones')}
+        >
+          <GlifoTransacciones activo={camino === '/transacciones'} />
+        </Posicion>
+        <View style={[estilos.posicion, estilos.posicionCentral]}>
+          <Pressable
+            style={estilos.botonCentral}
+            accessibilityRole="button"
+            accessibilityLabel="Nueva transacción"
+            onPress={alTocarCentral}
+          >
+            <Text style={estilos.mas}>+</Text>
+          </Pressable>
+        </View>
+        <Posicion
+          etiqueta="Agente"
+          activa={camino === '/agente'}
+          alTocar={() => enrutador.navigate('/agente')}
+        >
+          <GlifoAgente activo={camino === '/agente'} />
+        </Posicion>
+        <Posicion
+          etiqueta="Cuenta"
+          activa={enCuenta}
+          alTocar={() => enrutador.navigate('/cuenta')}
+        >
+          <GlifoCuenta activo={enCuenta} />
+        </Posicion>
       </View>
-      <Posicion
-        etiqueta="Agente"
-        activa={camino === '/agente'}
-        alTocar={() => enrutador.navigate('/agente')}
-      >
-        <GlifoAgente activo={camino === '/agente'} />
-      </Posicion>
-      <Posicion
-        etiqueta="Cuenta"
-        activa={enCuenta}
-        alTocar={() => enrutador.navigate('/cuenta')}
-      >
-        <GlifoCuenta activo={enCuenta} />
-      </Posicion>
     </View>
   );
 }
 
 const estilos = StyleSheet.create({
   barra: {
+    backgroundColor: paleta.fondo,
+    borderTopWidth: 1,
+    borderTopColor: paleta.separador,
+  },
+  contenido: {
     flexDirection: 'row',
-    backgroundColor: paleta.superficie,
+    alignSelf: 'stretch',
+  },
+  contenidoCentrado: {
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: ANCHO_CONTENIDO,
   },
   posicion: {
     flex: 1,
@@ -196,6 +241,11 @@ const estilos = StyleSheet.create({
   posicionCentral: {
     justifyContent: 'center',
     paddingTop: 0,
+  },
+  puntoActivo: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
   glifo: {
     width: 24,
@@ -289,29 +339,46 @@ const estilos = StyleSheet.create({
     textAlign: 'center',
   },
   etiquetaActiva: {
-    color: paleta.texto,
-    fontWeight: 'bold',
+    color: paleta.verdeLogin,
   },
   etiquetaInactiva: {
     color: paleta.textoSuave,
   },
   botonCentral: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: paleta.verdeLogin,
     alignItems: 'center',
     justifyContent: 'center',
+    transform: [{ translateY: -18 }],
     shadowColor: paleta.sombra,
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 6,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
   },
   mas: {
     color: paleta.texto,
-    fontSize: 32,
-    lineHeight: 36,
+    fontSize: 38,
+    lineHeight: 42,
     marginTop: -2,
+  },
+  insignia: {
+    position: 'absolute',
+    top: -6,
+    right: -10,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: paleta.rojoMonto,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  insigniaTexto: {
+    color: paleta.texto,
+    fontSize: 10,
+    lineHeight: 12,
   },
 });
