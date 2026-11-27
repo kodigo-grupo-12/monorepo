@@ -310,3 +310,22 @@ export function resumenCompromisos(
   }
   return { meDeben: meDeben / 100, debo: debo / 100, vencidos };
 }
+
+// El recargo de pagar en cuotas visto desde la compra (#140): cuánto más
+// cuesta el total financiado que el precio de contado, sin calcular ninguna
+// tasa. Solo aplica con naturaleza compra y precio de contado anotado.
+export function recargoPorCuotas(
+  compromiso: Pick<Compromiso, 'naturaleza' | 'monto' | 'precio_contado'>,
+): { extra: number; porcentaje: number } | undefined {
+  if (compromiso.naturaleza !== 'compra' || compromiso.precio_contado === undefined) {
+    return undefined;
+  }
+  const extra = enCentavos(compromiso.monto ?? 0) - enCentavos(compromiso.precio_contado);
+  if (extra <= 0) {
+    return { extra: 0, porcentaje: 0 };
+  }
+  return {
+    extra: extra / 100,
+    porcentaje: Math.round((extra / enCentavos(compromiso.precio_contado)) * 100),
+  };
+}

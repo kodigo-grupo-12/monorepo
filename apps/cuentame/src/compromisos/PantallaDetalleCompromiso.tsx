@@ -13,7 +13,7 @@ import { deISO, hoyISO } from '../transacciones/fechas';
 import { enlaceWhatsApp, mensajeRecordatorio } from './recordatorio';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { paleta } from '../tema/colores';
-import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe, montoBaseDe } from './calculos';
+import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe, montoBaseDe, recargoPorCuotas } from './calculos';
 import { cuotasDe, montoDeCuota, proximaCuota } from './cuotas';
 import type { Cuota } from './cuotas';
 import { ModalAbono } from './ModalAbono';
@@ -121,6 +121,7 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
   const cuotas = compromiso.plan ? cuotasDe(compromiso, transacciones, hoy) : [];
   const proxima = proximaCuota(cuotas);
   const pagadas = cuotas.filter((cuota) => cuota.estado === 'pagada').length;
+  const recargo = recargoPorCuotas(compromiso);
   const progreso = compromiso.monto > 0 ? Math.min(1, abonado / compromiso.monto) : 0;
   const origen = transacciones.find((t) => t.compromiso_id === compromiso.id && t.rol === 'origen');
   const carteraOrigen = origen?.cartera_id
@@ -298,6 +299,16 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
               );
             })}
           </>
+        ) : null}
+
+        {recargo ? (
+          <Text
+            style={[estilos.linea, { color: recargo.extra > 0 ? paleta.rojoMonto : paleta.textoSuave }]}
+          >
+            {recargo.extra > 0
+              ? `En cuotas pagás $ ${recargo.extra.toFixed(2)} más que de contado (+${recargo.porcentaje} %)`
+              : 'Sin recargo por pagar en cuotas'}
+          </Text>
         ) : null}
 
         {carteraOrigen ? (

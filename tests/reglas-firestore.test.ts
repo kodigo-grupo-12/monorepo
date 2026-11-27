@@ -459,6 +459,7 @@ describe('reglas de compromisos', () => {
       { plan: { modo: 'fijo', cuota: 20, numero_cuotas: 12, dia: 32, primera: '2026-12' } },
       { plan: { modo: 'fijo', cuota: 20, numero_cuotas: 1.5, dia: 5, primera: '2026-12' } },
       { global: true },
+      { precio_contado: 0 },
     ];
     for (const [indice, extra] of casos.entries()) {
       await assertFails(
@@ -475,6 +476,7 @@ describe('reglas de compromisos', () => {
         doc(db, 'compromisos', 'fijo'),
         compromisoDe(UID_A, {
           naturaleza: 'compra',
+          precio_contado: 400,
           plan: { modo: 'fijo', cuota: 20, numero_cuotas: 24, dia: 19, primera: '2026-12' },
         }),
       ),

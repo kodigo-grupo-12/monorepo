@@ -131,6 +131,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
   const [numeroCuotasTexto, setNumeroCuotasTexto] = useState('');
   const [diaPagoTexto, setDiaPagoTexto] = useState('');
   const [primeraCuota, setPrimeraCuota] = useState<Date>();
+  const [precioContadoTexto, setPrecioContadoTexto] = useState('');
 
   const { categorias } = useCategorias();
   const { compromisos } = useCompromisos();
@@ -201,6 +202,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
       setNumeroCuotasTexto('');
       setDiaPagoTexto('');
       setPrimeraCuota(undefined);
+      setPrecioContadoTexto(compromiso.precio_contado !== undefined ? `${compromiso.precio_contado}` : '');
       setConOrigen(false);
       setFoto(undefined);
       const [anioC, mesC, diaC] = compromiso.fecha.split('-').map(Number);
@@ -234,6 +236,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
     setNumeroCuotasTexto('');
     setDiaPagoTexto('');
     setPrimeraCuota(undefined);
+    setPrecioContadoTexto('');
   }, [visible, transaccion, compromiso]);
 
   // Monto: solo dígitos y un punto con hasta dos decimales.
@@ -294,6 +297,15 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
     setMontoTexto(Number.isInteger(total) ? `${total}` : total.toFixed(2));
   }
 
+  function alCambiarPrecioContado(texto: string) {
+    const conPunto = texto.replace(',', '.');
+    const partes = conPunto.split('.');
+    const normalizado = partes.length > 1
+      ? `${partes[0].replace(/\D/g, '')}.${partes.slice(1).join('').replace(/\D/g, '').slice(0, 2)}`
+      : conPunto.replace(/\D/g, '');
+    setPrecioContadoTexto(normalizado);
+  }
+
   function alMoverPrimera(delta: number) {
     if (!primeraCuota) {
       return;
@@ -317,6 +329,10 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
     /^\d+$/.test(numeroCuotasTexto) && Number(numeroCuotasTexto) >= 1 && Number(numeroCuotasTexto) <= 120;
   const diaPagoValido =
     /^\d+$/.test(diaPagoTexto) && Number(diaPagoTexto) >= 1 && Number(diaPagoTexto) <= 31;
+  // Precio de contado (#140): opcional y con la misma validación del monto.
+  const precioContadoValido =
+    precioContadoTexto === '' ||
+    (/^\d+(\.\d{1,2})?$/.test(precioContadoTexto) && Number(precioContadoTexto) > 0);
   const errorUltimaCuota =
     enCuotas && modoCuota === 'fijo' && cuotaValida && numeroCuotasValido && montoValido
       ? Math.round(Number(montoTexto) * 100) -
@@ -363,7 +379,8 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
       : naturaleza === 'dinero'
         ? !conOrigen || !!carteraId
         : !!categoriaId) &&
-    planValido;
+    planValido &&
+    precioContadoValido;
   const listo =
     segmento === 'compromiso'
       ? compromisoValido
@@ -432,6 +449,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
           monto: Number(montoTexto),
           vence: venceFecha ? fechaISO(venceFecha) : undefined,
           nota: notaTexto.trim() ? notaTexto.trim() : undefined,
+          precio_contado: precioContadoTexto !== '' ? Number(precioContadoTexto) : undefined,
         });
         mostrarAviso({ mensaje: 'Compromiso guardado', tipo: 'exito' });
         alCerrar();
@@ -469,6 +487,10 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
                     : '',
                 }
               : undefined,
+            precio_contado:
+              naturaleza === 'compra' && precioContadoTexto !== ''
+                ? Number(precioContadoTexto)
+                : undefined,
             categoria_id: naturaleza === 'compra' ? categoriaId : undefined,
             nota: notaTexto.trim() ? notaTexto.trim() : undefined,
           },
@@ -1117,6 +1139,18 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
                   </>
                 ) : null}
               </>
+            ) : null}
+
+            {segmento === 'compromiso' && naturaleza === 'compra' ? (
+              <TextInput
+                style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+                value={precioContadoTexto}
+                onChangeText={alCambiarPrecioContado}
+                keyboardType="decimal-pad"
+                placeholder="Precio de contado (opcional)"
+                placeholderTextColor={paleta.textoSuave}
+                accessibilityLabel="Precio de contado"
+              />
             ) : null}
 
 {!enEdicionCompromiso ? (
