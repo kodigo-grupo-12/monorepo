@@ -18,6 +18,7 @@ import {
   estaAbierto,
   estadoDe,
   pendienteDe,
+  recargoPorCuotas,
   resumenCompromisos,
   montoBaseDe,
 } from '../../apps/cuentame/src/compromisos/calculos';
@@ -46,6 +47,17 @@ describe('montoBaseDe', () => {
   it('la compra usa su precio de contado y el dinero su monto', () => {
     expect(montoBaseDe(compromiso({ naturaleza: 'compra', precio_contado: 100, monto: undefined }))).toBe(100);
     expect(montoBaseDe(compromiso())).toBe(50);
+  });
+});
+
+describe('montoBaseDe con plan', () => {
+  it('con plan el monto es el total financiado y manda', () => {
+    expect(
+      montoBaseDe(
+        compromiso({ naturaleza: 'compra', precio_contado: 400, monto: 480, plan: { modo: 'fijo', cuota: 20, numero_cuotas: 24, dia: 19, primera: '2026-12' } }),
+      ),
+    ).toBe(480);
+    expect(montoBaseDe(compromiso({ naturaleza: 'compra', precio_contado: 100, monto: undefined }))).toBe(100);
   });
 });
 
@@ -345,5 +357,26 @@ describe('proximosVencimientos', () => {
     const enDoceDias = vencimiento({ id: 'c1', vence: '2026-12-31' });
     expect(proximosVencimientos([enDoceDias], [], '2026-12-19', 12)).toHaveLength(1);
     expect(proximosVencimientos([enDoceDias], [], '2026-12-19')).toHaveLength(0);
+  });
+});
+
+describe('recargoPorCuotas', () => {
+  it('la refri de 480 contra 400 de contado carga 80 (20 %)', () => {
+    expect(
+      recargoPorCuotas(compromiso({ naturaleza: 'compra', monto: 480, precio_contado: 400 })),
+    ).toEqual({ extra: 80, porcentaje: 20 });
+  });
+
+  it('sin recargo da ceros; sin precio de contado o con dinero no aplica', () => {
+    expect(recargoPorCuotas(compromiso({ naturaleza: 'compra', monto: 480, precio_contado: 480 }))).toEqual({
+      extra: 0,
+      porcentaje: 0,
+    });
+    expect(recargoPorCuotas(compromiso({ naturaleza: 'compra', monto: 480, precio_contado: 500 }))).toEqual({
+      extra: 0,
+      porcentaje: 0,
+    });
+    expect(recargoPorCuotas(compromiso({ naturaleza: 'compra', monto: 480 }))).toBeUndefined();
+    expect(recargoPorCuotas(compromiso({ monto: 480, precio_contado: 400 }))).toBeUndefined();
   });
 });

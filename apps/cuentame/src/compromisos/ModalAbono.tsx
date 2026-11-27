@@ -14,6 +14,8 @@ import { mostrarAviso } from '../avisos/avisos';
 import { paleta } from '../tema/colores';
 import { SelectorCartera } from '../transacciones/SelectorCartera';
 import { pendienteDe, validarAbono } from './calculos';
+import { cuotasDe, montoDeCuota, proximaCuota } from './cuotas';
+import { hoyISO } from '../transacciones/fechas';
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -36,14 +38,19 @@ type Props = {
 
 // Modal a pantalla completa sin navbar (excepción de la T006, igual que el
 // del +): registra un cobro o un pago (#134). El monto arranca con el
-// pendiente, la cartera con la del origen y la fecha con hoy.
+// pendiente, o con el de la próxima cuota si hay plan (#139); el tope sigue
+// siendo el pendiente total. La cartera arranca con la del origen y la
+// fecha con hoy.
 export function ModalAbono({ visible, alCerrar, compromiso, transacciones }: Props) {
   const margenes = useSafeAreaInsets();
   const { carteras } = useCarteras();
   const { categorias } = useCategorias();
   const pendiente = pendienteDe(compromiso, transacciones);
+  const proxima = proximaCuota(cuotasDe(compromiso, transacciones, hoyISO()));
 
-  const [montoTexto, setMontoTexto] = useState(pendiente.toFixed(2));
+  const [montoTexto, setMontoTexto] = useState(
+    (proxima ? montoDeCuota(proxima) : pendiente).toFixed(2),
+  );
   const [fecha, setFecha] = useState(new Date());
   const [carteraId, setCarteraId] = useState<string | undefined>(compromiso.cartera_id);
   const [categoriaId, setCategoriaId] = useState<string | undefined>(compromiso.categoria_id);

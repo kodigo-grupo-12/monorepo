@@ -13,7 +13,9 @@ import { deISO, hoyISO } from '../transacciones/fechas';
 import { enlaceWhatsApp, mensajeRecordatorio } from './recordatorio';
 import { ModalAgregarTransaccion } from '../transacciones/ModalAgregarTransaccion';
 import { paleta } from '../tema/colores';
-import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe, montoBaseDe } from './calculos';
+import { abonadoDe, abonosDe, amarradasA, diasDeAtraso, estadoDe, pendienteDe, montoBaseDe, recargoPorCuotas } from './calculos';
+import { cuotasDe, montoDeCuota, proximaCuota } from './cuotas';
+import type { Cuota } from './cuotas';
 import { ModalAbono } from './ModalAbono';
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -29,6 +31,30 @@ const TEXTO_ESTADO: Record<string, string> = {
 function diaLargo(iso: string): string {
   const fecha = deISO(iso);
   return `${fecha.getDate()} ${MESES_CORTOS[fecha.getMonth()]} ${fecha.getFullYear()}`;
+}
+
+function diaCorto(iso: string): string {
+  const fecha = deISO(iso);
+  return `${fecha.getDate()} ${MESES_CORTOS[fecha.getMonth()]}`;
+}
+
+// El estado de una cuota en el calendario (#139): «Pagada» con check,
+// «Parcial $15 de $20», «Pendiente» o «Atrasada · N días» en rojo.
+function estadoDeCuota(cuota: Cuota): { texto: string; color: string } {
+  if (cuota.estado === 'pagada') {
+    return { texto: '✓ Pagada', color: paleta.verdeLogin };
+  }
+  if (cuota.estado === 'parcial') {
+    return {
+      texto: `Parcial $ ${cuota.pagado.toFixed(2)} de $ ${(cuota.esperado ?? cuota.referencia).toFixed(2)}`,
+      color: paleta.texto,
+    };
+  }
+  if (cuota.estado === 'atrasada') {
+    const dias = cuota.diasAtraso === 1 ? '1 día' : `${cuota.diasAtraso} días`;
+    return { texto: `Atrasada · ${dias}`, color: paleta.rojoMonto };
+  }
+  return { texto: 'Pendiente', color: paleta.textoSuave };
 }
 
 // Detalle de un compromiso (spec #130, issue #133): todo en vivo, sin
@@ -91,6 +117,11 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
   const estado = estadoDe(compromiso, transacciones, hoy);
   const abonado = abonadoDe(compromiso.id ?? '', transacciones);
   const pendiente = pendienteDe(compromiso, transacciones);
+  // Con plan (#139): desglose de cuotas y la próxima por venir.
+  const cuotas = compromiso.plan ? cuotasDe(compromiso, transacciones, hoy) : [];
+  const proxima = proximaCuota(cuotas);
+  const pagadas = cuotas.filter((cuota) => cuota.estado === 'pagada').length;
+  const recargo = recargoPorCuotas(compromiso);
   const progreso = compromiso.monto > 0 ? Math.min(1, abonado / compromiso.monto) : 0;
   const origen = transacciones.find((t) => t.compromiso_id === compromiso.id && t.rol === 'origen');
   const carteraOrigen = origen?.cartera_id
@@ -236,10 +267,49 @@ export function PantallaDetalleCompromiso({ id }: { id: string }) {
           <View style={[estilos.barraLlena, { width: `${Math.round(progreso * 100)}%`, backgroundColor: paleta.verdeLogin }]} />
         </View>
 
-        <Text style={[estilos.linea, { color: paleta.textoSuave }]}>
-          {compromiso.vence ? `Vence: ${diaLargo(compromiso.vence)}` : 'Sin fecha'}
-          {vencido ? ` · Atrasado · ${diasDeAtraso(compromiso.vence ?? hoy, hoy)} días` : ''}
-        </Text>
+        {compromiso.plan ? (
+          <Text style={[estilos.linea, { color: paleta.texto }]}>
+            {`Cuotas: ${pagadas} de ${cuotas.length} pagadas`}
+            {proxima
+              ? ` · Próxima: ${diaCorto(proxima.vence)} · $ ${montoDeCuota(proxima).toFixed(2)}`
+              : ''}
+          </Text>
+        ) : (
+          <Text style={[estilos.linea, { color: paleta.textoSuave }]}>
+            {compromiso.vence ? `Vence: ${diaLargo(compromiso.vence)}` : 'Sin fecha'}
+            {vencido ? ` · Atrasado · ${diasDeAtraso(compromiso.vence ?? hoy, hoy)} días` : ''}
+          </Text>
+        )}
+
+        {cuotas.length ? (
+          <>
+            <Text style={[estilos.seccion, { color: paleta.textoSuave }]}>Calendario de cuotas</Text>
+            {cuotas.map((cuota) => {
+              const estadoCuota = estadoDeCuota(cuota);
+              return (
+                <View key={cuota.numero} style={estilos.filaAbono}>
+                  <Text style={[estilos.abonoFecha, { color: paleta.textoSuave }]} numberOfLines={1}>
+                    {`${cuota.numero} · ${diaCorto(cuota.vence)} · $ ${(cuota.esperado ?? cuota.referencia).toFixed(2)}`}
+                    {cuota.pagado > 0 && cuota.estado !== 'pagada' ? ` · pagado $ ${cuota.pagado.toFixed(2)}` : ''}
+                  </Text>
+                  <Text style={[estilos.abonoCartera, { color: estadoCuota.color }]} numberOfLines={1}>
+                    {estadoCuota.texto}
+                  </Text>
+                </View>
+              );
+            })}
+          </>
+        ) : null}
+
+        {recargo ? (
+          <Text
+            style={[estilos.linea, { color: recargo.extra > 0 ? paleta.rojoMonto : paleta.textoSuave }]}
+          >
+            {recargo.extra > 0
+              ? `En cuotas pagás $ ${recargo.extra.toFixed(2)} más que de contado (+${recargo.porcentaje} %)`
+              : 'Sin recargo por pagar en cuotas'}
+          </Text>
+        ) : null}
 
         {carteraOrigen ? (
           <Text style={[estilos.linea, { color: paleta.textoSuave }]}>

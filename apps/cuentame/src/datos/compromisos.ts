@@ -30,15 +30,15 @@ export async function registrarAbono(compromiso: Compromiso, abono: DatosAbono):
 }
 
 // Corrige lo que la persona puede cambiar (#135): contraparte, teléfono,
-// monto, vencimiento y nota. Lo indefinido se borra con deleteField, igual
-// que actualizarTransaccion. Nunca toca uid, direccion, naturaleza, plan ni
-// cierre.
+// monto, vencimiento, nota y, desde #140, el precio de contado. Lo
+// indefinido se borra con deleteField, igual que actualizarTransaccion.
+// Nunca toca uid, direccion, naturaleza, plan ni cierre.
 export async function actualizarCompromiso(
   id: string,
-  cambios: Pick<Compromiso, 'contraparte' | 'telefono' | 'monto' | 'vence' | 'nota'>,
+  cambios: Pick<Compromiso, 'contraparte' | 'telefono' | 'monto' | 'vence' | 'nota' | 'precio_contado'>,
 ): Promise<void> {
   const documento: Record<string, unknown> = {};
-  for (const campo of ['contraparte', 'telefono', 'monto', 'vence', 'nota'] as const) {
+  for (const campo of ['contraparte', 'telefono', 'monto', 'vence', 'nota', 'precio_contado'] as const) {
     const valor = cambios[campo];
     if (valor === undefined) {
       documento[campo] = deleteField();

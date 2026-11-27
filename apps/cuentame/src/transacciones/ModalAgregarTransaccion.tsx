@@ -27,7 +27,7 @@ import type { Transaccion } from '../datos/transacciones';
 import { GlifoCategoria } from '../categorias/GlifoCategoria';
 import { mostrarAviso } from '../avisos/avisos';
 import { actualizarCompromiso, crearCompromiso } from '../datos/compromisos';
-import type { Compromiso as CompromisoDoc, Direccion, Naturaleza } from '../datos/compromisos';
+import type { Compromiso as CompromisoDoc, Direccion, Naturaleza, Plan } from '../datos/compromisos';
 import { contraparteValida, normalizarTelefono } from '../compromisos/contraparte';
 import { abonadoDe, notaDeOrigen, validarNuevoMonto } from '../compromisos/calculos';
 import { useCompromisos } from '../datos/useCompromisos';
@@ -64,6 +64,13 @@ async function comprimirFoto(uri: string): Promise<string | undefined> {
     calidad = Math.max(0.4, calidad - 0.1);
   }
   return undefined;
+}
+
+// El plan en una línea para el modo edición (#139): se ve y no se edita.
+function planTexto(plan: Plan): string {
+  const [anio, mes] = plan.primera.split('-');
+  const cuota = plan.modo === 'fijo' && plan.cuota ? `$ ${plan.cuota} al mes` : 'monto variable';
+  return `En cuotas: ${cuota}, ${plan.numero_cuotas} cuotas, día ${plan.dia}, primera ${MESES[Number(mes) - 1]} ${anio}.`;
 }
 
 // La misma normalización del ticket, pero para el render: un teléfono a
@@ -117,6 +124,14 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
   const [telefonoTexto, setTelefonoTexto] = useState('');
   const [venceFecha, setVenceFecha] = useState<Date>();
   const [conOrigen, setConOrigen] = useState(true);
+  // Plan de cuotas (#139): interruptor «En cuotas» y sus campos.
+  const [enCuotas, setEnCuotas] = useState(false);
+  const [modoCuota, setModoCuota] = useState<'fijo' | 'variable'>('fijo');
+  const [cuotaTexto, setCuotaTexto] = useState('');
+  const [numeroCuotasTexto, setNumeroCuotasTexto] = useState('');
+  const [diaPagoTexto, setDiaPagoTexto] = useState('');
+  const [primeraCuota, setPrimeraCuota] = useState<Date>();
+  const [precioContadoTexto, setPrecioContadoTexto] = useState('');
 
   const { categorias } = useCategorias();
   const { compromisos } = useCompromisos();
@@ -181,6 +196,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
         setVenceFecha(undefined);
       }
       setNotaTexto(compromiso.nota ?? '');
+      setEnCuotas(false);
+      setModoCuota('fijo');
+      setCuotaTexto('');
+      setNumeroCuotasTexto('');
+      setDiaPagoTexto('');
+      setPrimeraCuota(undefined);
+      setPrecioContadoTexto(compromiso.precio_contado !== undefined ? `${compromiso.precio_contado}` : '');
       setConOrigen(false);
       setFoto(undefined);
       const [anioC, mesC, diaC] = compromiso.fecha.split('-').map(Number);
@@ -208,6 +230,13 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
     setTelefonoTexto('');
     setVenceFecha(undefined);
     setConOrigen(true);
+    setEnCuotas(false);
+    setModoCuota('fijo');
+    setCuotaTexto('');
+    setNumeroCuotasTexto('');
+    setDiaPagoTexto('');
+    setPrimeraCuota(undefined);
+    setPrecioContadoTexto('');
   }, [visible, transaccion, compromiso]);
 
   // Monto: solo dígitos y un punto con hasta dos decimales.
@@ -220,6 +249,70 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
     setMontoTexto(normalizado);
   }
 
+  // Interruptor «En cuotas» (#139): al encender oculta «Vence» y propone el
+  // día de hoy como día de pago y el mes siguiente como primera cuota.
+  function alCambiarEnCuotas(valor: boolean) {
+    setEnCuotas(valor);
+    if (valor) {
+      const ahora = new Date();
+      setDiaPagoTexto(`${ahora.getDate()}`);
+      setPrimeraCuota(new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1));
+      setVenceFecha(undefined);
+    } else {
+      setModoCuota('fijo');
+      setCuotaTexto('');
+      setNumeroCuotasTexto('');
+      setDiaPagoTexto('');
+      setPrimeraCuota(undefined);
+    }
+  }
+
+  function alCambiarCuota(texto: string) {
+    const conPunto = texto.replace(',', '.');
+    const partes = conPunto.split('.');
+    const normalizado = partes.length > 1
+      ? `${partes[0].replace(/\D/g, '')}.${partes.slice(1).join('').replace(/\D/g, '').slice(0, 2)}`
+      : conPunto.replace(/\D/g, '');
+    setCuotaTexto(normalizado);
+    alRecalcularTotal(normalizado, numeroCuotasTexto);
+  }
+
+  function alCambiarNumeroCuotas(texto: string) {
+    const normalizado = texto.replace(/\D/g, '').slice(0, 3);
+    setNumeroCuotasTexto(normalizado);
+    alRecalcularTotal(cuotaTexto, normalizado);
+  }
+
+  // El «Total» se calcula como cuota × n; escribir el monto a mano lo
+  // sobrescribe (queda la nota «La última cuota es de …»), y tocar cuota o
+  // número vuelve a calcularlo.
+  function alRecalcularTotal(cuota: string, numero: string) {
+    if (!enCuotas || modoCuota !== 'fijo') {
+      return;
+    }
+    if (!/^\d+(\.\d{1,2})?$/.test(cuota) || !/^\d+$/.test(numero)) {
+      return;
+    }
+    const total = Math.round(Number(cuota) * Number(numero) * 100) / 100;
+    setMontoTexto(Number.isInteger(total) ? `${total}` : total.toFixed(2));
+  }
+
+  function alCambiarPrecioContado(texto: string) {
+    const conPunto = texto.replace(',', '.');
+    const partes = conPunto.split('.');
+    const normalizado = partes.length > 1
+      ? `${partes[0].replace(/\D/g, '')}.${partes.slice(1).join('').replace(/\D/g, '').slice(0, 2)}`
+      : conPunto.replace(/\D/g, '');
+    setPrecioContadoTexto(normalizado);
+  }
+
+  function alMoverPrimera(delta: number) {
+    if (!primeraCuota) {
+      return;
+    }
+    setPrimeraCuota(new Date(primeraCuota.getFullYear(), primeraCuota.getMonth() + delta, 1));
+  }
+
   // Al cambiar de tipo, una categoría del otro tipo deja de valer.
   function alCambiarTipo(valor: TipoTransaccion) {
     if (categoriaSeleccionada && categoriaSeleccionada.tipo !== valor) {
@@ -229,6 +322,44 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
   }
 
   const montoValido = /^\d+(\.\d{1,2})?$/.test(montoTexto) && Number(montoTexto) > 0;
+  // Plan de cuotas (#139): cuota y número (1 a 120), día 1 a 31, primera
+  // elegida, total > 0 y, en fijo, la última cuota > 0.
+  const cuotaValida = /^\d+(\.\d{1,2})?$/.test(cuotaTexto) && Number(cuotaTexto) > 0;
+  const numeroCuotasValido =
+    /^\d+$/.test(numeroCuotasTexto) && Number(numeroCuotasTexto) >= 1 && Number(numeroCuotasTexto) <= 120;
+  const diaPagoValido =
+    /^\d+$/.test(diaPagoTexto) && Number(diaPagoTexto) >= 1 && Number(diaPagoTexto) <= 31;
+  // Precio de contado (#140): opcional y con la misma validación del monto.
+  const precioContadoValido =
+    precioContadoTexto === '' ||
+    (/^\d+(\.\d{1,2})?$/.test(precioContadoTexto) && Number(precioContadoTexto) > 0);
+  const errorUltimaCuota =
+    enCuotas && modoCuota === 'fijo' && cuotaValida && numeroCuotasValido && montoValido
+      ? Math.round(Number(montoTexto) * 100) -
+          Math.round(Number(cuotaTexto) * 100) * (Number(numeroCuotasTexto) - 1) <=
+        0
+      : false;
+  const planSobrescrito =
+    enCuotas && modoCuota === 'fijo' && cuotaValida && numeroCuotasValido && montoValido
+      ? Math.round(Number(montoTexto) * 100) !==
+        Math.round(Number(cuotaTexto) * 100) * Number(numeroCuotasTexto)
+      : false;
+  const ultimaCuotaTexto =
+    planSobrescrito && !errorUltimaCuota
+      ? (
+          (Math.round(Number(montoTexto) * 100) -
+            Math.round(Number(cuotaTexto) * 100) * (Number(numeroCuotasTexto) - 1)) /
+          100
+        ).toFixed(2)
+      : undefined;
+  const planValido = !enCuotas
+    ? true
+    : (modoCuota === 'variable' || cuotaValida) &&
+      numeroCuotasValido &&
+      diaPagoValido &&
+      !!primeraCuota &&
+      montoValido &&
+      !errorUltimaCuota;
   const telefonoSeguro = telefonoTexto.trim() ? seguroTelefono(telefonoTexto) : undefined;
   const telefonoInvalido = !!telefonoTexto.trim() && telefonoSeguro === undefined;
   // En edición del compromiso (#135) el monto nuevo no puede quedar por
@@ -247,7 +378,9 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
       ? validacionMontoNuevo !== 'menor_que_abonado'
       : naturaleza === 'dinero'
         ? !conOrigen || !!carteraId
-        : !!categoriaId);
+        : !!categoriaId) &&
+    planValido &&
+    precioContadoValido;
   const listo =
     segmento === 'compromiso'
       ? compromisoValido
@@ -316,6 +449,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
           monto: Number(montoTexto),
           vence: venceFecha ? fechaISO(venceFecha) : undefined,
           nota: notaTexto.trim() ? notaTexto.trim() : undefined,
+          precio_contado: precioContadoTexto !== '' ? Number(precioContadoTexto) : undefined,
         });
         mostrarAviso({ mensaje: 'Compromiso guardado', tipo: 'exito' });
         alCerrar();
@@ -342,6 +476,21 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
             monto: Number(montoTexto),
             fecha: fechaISO(fecha),
             vence: venceFecha ? fechaISO(venceFecha) : undefined,
+            plan: enCuotas
+              ? {
+                  modo: modoCuota,
+                  ...(modoCuota === 'fijo' ? { cuota: Number(cuotaTexto) } : {}),
+                  numero_cuotas: Number(numeroCuotasTexto),
+                  dia: Number(diaPagoTexto),
+                  primera: primeraCuota
+                    ? `${primeraCuota.getFullYear()}-${String(primeraCuota.getMonth() + 1).padStart(2, '0')}`
+                    : '',
+                }
+              : undefined,
+            precio_contado:
+              naturaleza === 'compra' && precioContadoTexto !== ''
+                ? Number(precioContadoTexto)
+                : undefined,
             categoria_id: naturaleza === 'compra' ? categoriaId : undefined,
             nota: notaTexto.trim() ? notaTexto.trim() : undefined,
           },
@@ -848,6 +997,162 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
               </Text>
             ) : null}
 
+            {segmento === 'compromiso' && enEdicionCompromiso && compromiso?.plan ? (
+              <Text style={[estilos.ayuda, { color: paleta.textoSuave }]}>
+                {planTexto(compromiso.plan)}
+              </Text>
+            ) : null}
+
+            {segmento === 'compromiso' && !enEdicionCompromiso ? (
+              <>
+                <Pressable
+                  style={estilos.filaAccion}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: enCuotas }}
+                  accessibilityLabel="En cuotas"
+                  onPress={() => alCambiarEnCuotas(!enCuotas)}
+                >
+                  <View
+                    style={[
+                      estilos.casilla,
+                      { borderColor: paleta.separador },
+                      enCuotas && { backgroundColor: paleta.verdeLogin, borderColor: paleta.verdeLogin },
+                    ]}
+                  >
+                    {enCuotas ? <View style={estilos.casillaPalomita} /> : null}
+                  </View>
+                  <Text style={[estilos.filaTexto, { color: paleta.texto, flex: 1 }]}>En cuotas</Text>
+                </Pressable>
+
+                {enCuotas ? (
+                  <>
+                    <View style={estilos.selector}>
+                      {(['fijo', 'variable'] as const).map((valor) => (
+                        <Pressable
+                          key={valor}
+                          style={[
+                            estilos.segmento,
+                            modoCuota === valor && { backgroundColor: paleta.verdeOscuro, borderRadius: 26 },
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: modoCuota === valor }}
+                          onPress={() => {
+                            setModoCuota(valor);
+                            if (valor === 'fijo') {
+                              alRecalcularTotal(cuotaTexto, numeroCuotasTexto);
+                            }
+                          }}
+                        >
+                          <Text
+                            style={[
+                              estilos.segmentoTexto,
+                              { color: modoCuota === valor ? paleta.texto : paleta.textoSuave },
+                              modoCuota === valor && { fontWeight: 'bold' },
+                            ]}
+                          >
+                            {valor === 'fijo' ? 'Cuota fija' : 'Monto variable'}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
+                    {modoCuota === 'fijo' ? (
+                      <>
+                        <TextInput
+                          style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+                          value={cuotaTexto}
+                          onChangeText={alCambiarCuota}
+                          keyboardType="decimal-pad"
+                          placeholder="Cuota mensual (ej. 20)"
+                          placeholderTextColor={paleta.textoSuave}
+                          accessibilityLabel="Cuota mensual"
+                        />
+                        <TextInput
+                          style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+                          value={numeroCuotasTexto}
+                          onChangeText={alCambiarNumeroCuotas}
+                          keyboardType="number-pad"
+                          placeholder="Número de cuotas (1 a 120)"
+                          placeholderTextColor={paleta.textoSuave}
+                          accessibilityLabel="Número de cuotas"
+                        />
+                        {errorUltimaCuota ? (
+                          <Text style={[estilos.errorTexto, { color: paleta.rojo }]}>
+                            La última cuota no puede ser 0 o negativa
+                          </Text>
+                        ) : ultimaCuotaTexto ? (
+                          <Text style={[estilos.ayuda, { color: paleta.textoSuave }]}>
+                            La última cuota es de $ {ultimaCuotaTexto}
+                          </Text>
+                        ) : null}
+                      </>
+                    ) : (
+                      <Text style={[estilos.ayuda, { color: paleta.textoSuave }]}>
+                        Cada mes pagás lo que toque; el total es tu referencia.
+                      </Text>
+                    )}
+
+                    <TextInput
+                      style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+                      value={diaPagoTexto}
+                      onChangeText={(texto) => setDiaPagoTexto(texto.replace(/\D/g, '').slice(0, 2))}
+                      keyboardType="number-pad"
+                      placeholder="Día de pago (1 a 31)"
+                      placeholderTextColor={paleta.textoSuave}
+                      accessibilityLabel="Día de pago"
+                    />
+                    {Number(diaPagoTexto) > 28 ? (
+                      <Text style={[estilos.ayuda, { color: paleta.textoSuave }]}>
+                        En los meses más cortos vence el último día.
+                      </Text>
+                    ) : null}
+
+                    <View style={estilos.fila}>
+                      <View style={estilos.calendario}>
+                        <View style={estilos.calendarioPinIzquierdo} />
+                        <View style={estilos.calendarioPinDerecho} />
+                        <View style={estilos.calendarioLinea} />
+                      </View>
+                      <Pressable
+                        style={estilos.flecha}
+                        accessibilityRole="button"
+                        accessibilityLabel="Mes anterior de la primera cuota"
+                        onPress={() => alMoverPrimera(-1)}
+                      >
+                        <View style={estilos.flechaIzquierda} />
+                      </Pressable>
+                      <View style={[estilos.pastilla, { backgroundColor: paleta.superficie }]}>
+                        <Text style={[estilos.pastillaTexto, { color: paleta.texto }]}>
+                          Primera{' '}
+                          {primeraCuota ? `${MESES[primeraCuota.getMonth()]} ${primeraCuota.getFullYear()}` : ''}
+                        </Text>
+                      </View>
+                      <Pressable
+                        style={estilos.flecha}
+                        accessibilityRole="button"
+                        accessibilityLabel="Mes siguiente de la primera cuota"
+                        onPress={() => alMoverPrimera(1)}
+                      >
+                        <View style={estilos.flechaDerecha} />
+                      </Pressable>
+                    </View>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+
+            {segmento === 'compromiso' && naturaleza === 'compra' ? (
+              <TextInput
+                style={[estilos.entrada, { color: paleta.texto, borderColor: paleta.separador }]}
+                value={precioContadoTexto}
+                onChangeText={alCambiarPrecioContado}
+                keyboardType="decimal-pad"
+                placeholder="Precio de contado (opcional)"
+                placeholderTextColor={paleta.textoSuave}
+                accessibilityLabel="Precio de contado"
+              />
+            ) : null}
+
 {!enEdicionCompromiso ? (
             <View style={estilos.fila}>
               <View style={estilos.calendario}>
@@ -883,7 +1188,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
                 <View style={estilos.calendarioPinDerecho} />
                 <View style={estilos.calendarioLinea} />
               </View>
-              {venceFecha ? (
+              {!enCuotas ? (venceFecha ? (
                 <>
                   <Pressable
                     style={estilos.flecha}
@@ -914,7 +1219,7 @@ export function ModalAgregarTransaccion({ visible, alCerrar, transaccion, compro
                 >
                   <Text style={[estilos.pastillaTexto, { color: paleta.textoSuave }]}>Sin fecha</Text>
                 </Pressable>
-              )}
+              )) : null}
             </View>
 
             {!enEdicionCompromiso ? naturaleza === 'dinero' ? (

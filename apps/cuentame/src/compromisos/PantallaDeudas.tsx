@@ -11,6 +11,7 @@ import { useTransacciones } from '../datos/useTransacciones';
 import { deISO, hoyISO } from '../transacciones/fechas';
 import { paleta } from '../tema/colores';
 import { diasDeAtraso, estadoDe, ordenarParaLista, pendienteDe, resumenCompromisos } from './calculos';
+import { atrasoDePlan, cuotasDe, proximaCuota } from './cuotas';
 
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
@@ -45,6 +46,7 @@ function FilaCompromiso({
 }) {
   const pendiente = pendienteDe(compromiso, transacciones);
   const vencido = estadoDe(compromiso, transacciones, hoy) === 'vencido';
+  const proxima = compromiso.plan ? proximaCuota(cuotasDe(compromiso, transacciones, hoy)) : undefined;
   return (
     <View>
       <Pressable
@@ -63,14 +65,22 @@ function FilaCompromiso({
             </Text>
           </View>
           <Text style={[estilos.vence, { color: paleta.textoSuave }]}>
-            {compromiso.vence ? `Vence ${diaCorto(compromiso.vence)}` : 'Sin fecha'}
+            {compromiso.plan && proxima
+              ? `Cuota ${proxima.numero} de ${compromiso.plan.numero_cuotas} · vence ${diaCorto(proxima.vence)}`
+              : compromiso.vence
+                ? `Vence ${diaCorto(compromiso.vence)}`
+                : 'Sin fecha'}
           </Text>
         </View>
         <View style={estilos.lado}>
           {vencido ? (
             <View style={estilos.badge}>
               <Text style={estilos.badgeTexto}>
-                Atrasado · {diasDeAtraso(compromiso.vence ?? hoy, hoy)} días
+                Atrasado ·{' '}
+                {compromiso.plan
+                  ? atrasoDePlan(compromiso, transacciones, hoy)
+                  : diasDeAtraso(compromiso.vence ?? hoy, hoy)}{' '}
+                días
               </Text>
             </View>
           ) : null}
